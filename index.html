@@ -50,7 +50,7 @@
   </script>
 
   <script type="text/babel">
-const { useState, useEffect } = React;
+const { useState, useEffect, useRef } = React;
 
 // ══════════════════════════════════════════════════════════════════════════════
 //  BUSINESS LOGIC
@@ -748,10 +748,14 @@ const MiningPanel = ({ currentUser, onEarn, onBuyRig }) => {
     return () => clearInterval(id);
   }, []);
 
-  // Sync fragments to user when leaving
+  // Sync fragments to user on unmount only
+  const fragsRef = React.useRef(fragments);
+  const histRef  = React.useRef(history);
+  fragsRef.current = fragments;
+  histRef.current  = history;
   useEffect(() => {
-    return () => { onEarn(fragments, history); };
-  }, [fragments, history]);
+    return () => { onEarn(fragsRef.current, histRef.current); };
+  }, []);
 
   const handleTap = (e) => {
     const gained = tapYield;
@@ -760,9 +764,9 @@ const MiningPanel = ({ currentUser, onEarn, onBuyRig }) => {
     window._miningState.totalMined += gained;
 
     // Floating popup at tap position
-    const rect = tapRef.current?.getBoundingClientRect();
-    const clientX = e.touches?.[0]?.clientX ?? e.clientX;
-    const clientY = e.touches?.[0]?.clientY ?? e.clientY;
+    const rect = tapRef.current ? tapRef.current.getBoundingClientRect() : null;
+    const clientX = (e.touches && e.touches[0]) ? e.touches[0].clientX : e.clientX;
+    const clientY = (e.touches && e.touches[0]) ? e.touches[0].clientY : e.clientY;
     const px = rect ? clientX - rect.left : 100;
     const py = rect ? clientY - rect.top  : 100;
     const id = Date.now() + Math.random();
@@ -812,7 +816,7 @@ const MiningPanel = ({ currentUser, onEarn, onBuyRig }) => {
   const nextRig    = MINING_RIGS[rigLevel+1];
 
   return (
-    <div style={{minHeight:"100vh",background:"#07070f",fontFamily:ff,color:"#e0e0e0",paddingBottom:90,maxWidth:480,margin:"0 auto",position:"relative",overflowX:"hidden"}}>
+    <div style={{background:"#07070f",fontFamily:ff,color:"#e0e0e0",paddingBottom:16}}>
 
       {/* Price alert toast */}
       {lastNotif&&(
@@ -844,7 +848,7 @@ const MiningPanel = ({ currentUser, onEarn, onBuyRig }) => {
             <div>
               <div style={{fontSize:10,color:"#555",fontWeight:700,letterSpacing:1,textTransform:"uppercase",marginBottom:4}}>Harga LBP Fragment</div>
               <div style={{fontSize:28,fontWeight:800,color:priceColor,lineHeight:1}}>Rp{price.toFixed(2)}<span style={{fontSize:12,color:"#555"}}>/frag</span></div>
-              <div style={{fontSize:11,marginTop:4,color:priceDiff>=0?"#4ade80":"#ef4444",fontWeight:600}}>{priceDiff>=0?"▲":"▼"} {Math.abs(priceDiff).toFixed(2)} ({((Math.abs(priceDiff)/(priceHist[priceHist.length-2]||price))*100).toFixed(1)}%)</div>
+              <div style={{fontSize:11,marginTop:4,color:priceDiff>=0?"#4ade80":"#ef4444",fontWeight:600}}>{priceDiff>=0?"▲":"▼"} {Math.abs(priceDiff).toFixed(2)} ({(priceHist.length>1 ? ((Math.abs(priceDiff)/(priceHist[priceHist.length-2]||price||1))*100).toFixed(1) : "0.0")}%)</div>
             </div>
             <div style={{textAlign:"right"}}>
               <div style={{fontSize:10,color:"#555",marginBottom:4}}>1 LBP ≈</div>
@@ -865,12 +869,12 @@ const MiningPanel = ({ currentUser, onEarn, onBuyRig }) => {
                 <polygon points={`0,${chartH} ${pts} ${chartW},${chartH}`} fill="url(#chartGrad)"/>
                 <polyline points={pts} fill="none" stroke={priceColor} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round"/>
                 {/* Last point dot */}
-                <circle cx={+(priceHist.length===1?chartW/2:chartW).toFixed(1)} cy={+(chartH-((price-minP)/(maxP-minP||1))*(chartH-6)-3).toFixed(1)} r="3.5" fill={priceColor}/>
+                <circle cx={priceHist.length===1?chartW/2:chartW} cy={chartH-((price-minP)/(maxP-minP||1))*(chartH-6)-3} r="3.5" fill={priceColor}/>
               </>
             )}
           </svg>
           <div style={{display:"flex",justifyContent:"space-between",fontSize:9,color:"#333",marginTop:2}}>
-            <span>Rp{minP.toFixed(1)}</span><span style={{color:"#555"}}>Update setiap 8s</span><span>Rp{maxP.toFixed(1)}</span>
+            <span>Rp{minP.toFixed(1)}</span><span style={{color:"#555"}}>~8s</span><span>Rp{maxP.toFixed(1)}</span>
           </div>
         </div>
 
