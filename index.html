@@ -36,17 +36,19 @@
   </div>
   <div id="root"></div>
 
-  <!-- Firebase SDKs (CDN) -->
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-    import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile }
-      from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-    import { getFirestore, doc, setDoc, getDoc, updateDoc, collection, query, orderBy,
-             onSnapshot, addDoc, serverTimestamp, getDocs, where, writeBatch }
-      from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-    import { getStorage, ref, uploadString, getDownloadURL, deleteObject }
-      from "https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js";
+  <!-- Firebase compat SDKs (works with Babel, no ES module conflict) -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
 
+  <!-- React + Babel -->
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <script>
+    // Init Firebase dengan compat SDK (global firebase object)
     const firebaseConfig = {
       apiKey: "AIzaSyDKL6MO1ghXs5bfiMmwYsBFot1bsHpEBGs",
       authDomain: "northgate-sales-3a749.firebaseapp.com",
@@ -55,30 +57,16 @@
       messagingSenderId: "821475148666",
       appId: "1:821475148666:web:95a12af77ff862cb144cc3"
     };
+    firebase.initializeApp(firebaseConfig);
 
-    const app  = initializeApp(firebaseConfig);
-    const auth = getAuth(app);
-    const db   = getFirestore(app);
-    const storage = getStorage(app);
-
-    // Expose to window so React (Babel) can access
-    window._FB = { auth, db, storage,
-      createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut,
-      onAuthStateChanged, updateProfile,
-      doc, setDoc, getDoc, updateDoc, collection, query, orderBy,
-      onSnapshot, addDoc, serverTimestamp, getDocs, where, writeBatch,
-      ref, uploadString, getDownloadURL, deleteObject
-    };
+    window._auth    = firebase.auth();
+    window._db      = firebase.firestore();
+    window._storage = firebase.storage();
     window._fbReady = true;
     document.dispatchEvent(new Event("fbReady"));
   </script>
 
-  <!-- React + Babel -->
-  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
-  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
-  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-
-  <script type="text/babel" data-type="module">
+  <script type="text/babel">
 const { useState, useEffect, useRef, useCallback } = React;
 
 // ── CONSTANTS ──────────────────────────────────────────────────────────────────
@@ -140,28 +128,30 @@ const exportCSV = (rows, filename) => {
   a.click();
 };
 
-// ── Firebase helpers ───────────────────────────────────────────────────────────
-const FB = () => window._FB;
+// ── Firebase helpers (compat SDK) ─────────────────────────────────────────────
+const auth    = () => window._auth;
+const db      = () => window._db;
+const storage = () => window._storage;
 
-const uRef  = uid => FB().doc(FB().db, "users", uid);
-const sRef  = ()  => FB().doc(FB().db, "settings", "global");
-const cRef  = uid => FB().collection(FB().db, "chats", uid, "messages");
+const uRef  = uid => db().collection("users").doc(uid);
+const sRef  = ()  => db().collection("settings").doc("global");
+const cRef  = uid => db().collection("chats").doc(uid).collection("messages");
 
 const getUser = async uid => {
-  const snap = await FB().getDoc(uRef(uid));
-  return snap.exists() ? {id:snap.id,...snap.data()} : null;
+  const snap = await uRef(uid).get();
+  return snap.exists ? {id:snap.id,...snap.data()} : null;
 };
 
 const saveUser = async (uid, data) => {
-  await FB().setDoc(uRef(uid), data, {merge:true});
+  await uRef(uid).set(data, {merge:true});
 };
 
 const patchUser = async (uid, patch) => {
-  await FB().updateDoc(uRef(uid), patch);
+  await uRef(uid).update(patch);
 };
 
 const getAllUsers = async () => {
-  const snap = await FB().getDocs(FB().collection(FB().db,"users"));
+  const snap = await db().collection("users").get();
   return snap.docs.map(d=>({id:d.id,...d.data()}));
 };
 
@@ -338,16 +328,13 @@ const ChatView = ({currentUser,targetName,targetAvatar,targetLbp,threadUid,isAdm
   const bottomRef        = useRef(null);
 
   useEffect(()=>{
-    const {onSnapshot,query,orderBy,collection,db,updateDoc,doc} = FB();
-    const q = query(cRef(threadUid), orderBy("ts","asc"));
-    const unsub = onSnapshot(q, snap=>{
+    const unsub = cRef(threadUid).orderBy("ts","asc").onSnapshot(snap=>{
       const list = snap.docs.map(d=>({id:d.id,...d.data()}));
       setMsgs(list);
-      // mark messages as read
       snap.docs.forEach(d=>{
         const m=d.data();
         if(!m.read && m.from!==(isAdmin?"admin":"user")) {
-          updateDoc(doc(db,"chats",threadUid,"messages",d.id),{read:true}).catch(()=>{});
+          cRef(threadUid).doc(d.id).update({read:true}).catch(()=>{});
         }
       });
       setTimeout(()=>bottomRef.current?.scrollIntoView({behavior:"smooth"}),50);
@@ -359,13 +346,13 @@ const ChatView = ({currentUser,targetName,targetAvatar,targetLbp,threadUid,isAdm
     if(!msg.trim()||sending) return;
     setSending(true);
     try {
-      await FB().addDoc(cRef(threadUid),{
+      await cRef(threadUid).add({
         from: isAdmin?"admin":"user",
         text: msg.trim(),
         time: nowTime(),
         date: today(),
         read: false,
-        ts:   FB().serverTimestamp(),
+        ts:   firebase.firestore.FieldValue.serverTimestamp(),
       });
       setMsg("");
     } finally { setSending(false); }
@@ -484,7 +471,7 @@ function App() {
   // ── Auth listener ────────────────────────────────────────────────────────
   useEffect(()=>{
     if(!fbReady) return;
-    const unsub = FB().onAuthStateChanged(FB().auth, async fireUser=>{
+    const unsub = auth().onAuthStateChanged(async fireUser=>{
       if(fireUser){
         setAuthUser(fireUser);
         await loadProfile(fireUser.uid);
@@ -514,8 +501,8 @@ function App() {
 
   const loadSettings = async () => {
     try {
-      const snap = await FB().getDoc(sRef());
-      if(snap.exists()) setSettings(snap.data());
+      const snap = await sRef().get();
+      if(snap.exists) setSettings(snap.data());
     } catch(e){}
   };
 
@@ -529,10 +516,8 @@ function App() {
   // ── Real-time unread listener for admin ──────────────────────────────────
   useEffect(()=>{
     if(!profile||profile.role!=="admin") return;
-    const {onSnapshot,query,orderBy,where} = FB();
     const unsubs = allUsers.map(u=>{
-      const q = query(cRef(u.id), where("from","==","user"), where("read","==",false));
-      return onSnapshot(q, snap=>{
+      return cRef(u.id).where("from","==","user").where("read","==",false).onSnapshot(snap=>{
         setUnreadMap(prev=>({...prev,[u.id]:snap.size}));
       });
     });
@@ -563,7 +548,7 @@ function App() {
       const email = lUser.toLowerCase()==="northgate"||lUser.toLowerCase()==="admin"
         ? ADMIN_EMAIL
         : `${lUser.toLowerCase().replace(/[^a-z0-9]/g,"")}@northgate.app`;
-      await FB().signInWithEmailAndPassword(FB().auth, email, lPass);
+      await auth().signInWithEmailAndPassword(email, lPass);
       setLUser(""); setLPass("");
     } catch(e){
       setLErr(e.code==="auth/invalid-credential"||e.code==="auth/wrong-password"||e.code==="auth/user-not-found"
@@ -587,7 +572,7 @@ function App() {
         if(!ref){setRErr("Kode referral tidak valid!"); setLoading(false); return;}
         referrerId=ref.id;
       }
-      const cred = await FB().createUserWithEmailAndPassword(FB().auth, email, rPass);
+      const cred = await auth().createUserWithEmailAndPassword(email, rPass);
       const code = genCode(rUser);
       const newU = {
         uid:cred.user.uid, username:rUser, email, role:"user",
@@ -597,7 +582,7 @@ function App() {
         lbpHistory:[{type:"earn",amount:settings.newUserBonus,desc:"Bonus signup",date:today()}],
         salesHistory:[], referralCode:code, referredBy:referrerId, referrals:[], monthlySales:0, avatar:null
       };
-      await FB().setDoc(FB().doc(FB().db,"users",cred.user.uid), newU);
+      await db().collection("users").doc(cred.user.uid).set(newU);
       if(referrerId){
         const referrer = await getUser(referrerId);
         if(referrer) await patchUser(referrerId,{referrals:[...(referrer.referrals||[]),cred.user.uid]});
@@ -611,7 +596,7 @@ function App() {
   };
 
   const logout = async () => {
-    await FB().signOut(FB().auth);
+    await auth().signOut();
     setProfile(null); setAllUsers([]); setActiveNav("home"); setSubPanel(null);
   };
 
@@ -690,14 +675,14 @@ function App() {
     try {
       if(!dataUrl){
         if(profile.avatar){
-          try{ await FB().deleteObject(FB().ref(FB().storage,`avatars/${profile.id}`)); }catch(e){}
+          try{ await storage().ref(`avatars/${profile.id}`).delete(); }catch(e){}
         }
         await patchProfile({avatar:null});
         showToast("s","Foto profil dihapus.");
       } else {
-        const storageRef = FB().ref(FB().storage,`avatars/${profile.id}`);
-        await FB().uploadString(storageRef, dataUrl,"data_url");
-        const url = await FB().getDownloadURL(storageRef);
+        const storageRef = storage().ref(`avatars/${profile.id}`);
+        await storageRef.putString(dataUrl,"data_url");
+        const url = await storageRef.getDownloadURL();
         await patchProfile({avatar:url});
         showToast("s","Foto profil diperbarui! ✓");
       }
@@ -1048,7 +1033,7 @@ function App() {
                   style={{flex:1,background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:10,padding:"12px 14px",color:"#e0e0e0",fontSize:16,outline:"none",fontFamily:ff,boxSizing:"border-box",WebkitAppearance:"none"}}/>
                 <span style={{fontSize:12,color:"#666",whiteSpace:"nowrap"}}>{fmt((settings.newUserBonus||0)*LBP_TO_IDR)}</span>
               </div>
-              <Btn onClick={async()=>{await FB().setDoc(sRef(),settings,{merge:true}); showToast("s","Tersimpan!");}}>Simpan</Btn>
+              <Btn onClick={async()=>{await sRef().set(settings,{merge:true}); showToast("s","Tersimpan!");}}>Simpan</Btn>
             </Card>
             <SecTitle>Member Cards</SecTitle>
             <Card>{MEMBER_CARDS.map((c,i)=>(
@@ -1086,9 +1071,7 @@ function App() {
     // Unread from admin
     const [unreadAdmin,setUnreadAdmin] = useState(0);
     useEffect(()=>{
-      const {onSnapshot,query,where} = FB();
-      const q = query(cRef(profile.id), where("from","==","admin"), where("read","==",false));
-      const unsub = onSnapshot(q, snap=>setUnreadAdmin(snap.size));
+      const unsub = cRef(profile.id).where("from","==","admin").where("read","==",false).onSnapshot(snap=>setUnreadAdmin(snap.size));
       return ()=>unsub();
     },[profile.id]);
 
