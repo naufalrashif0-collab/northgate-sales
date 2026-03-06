@@ -17,25 +17,46 @@
     *{margin:0;padding:0;box-sizing:border-box}
     html,body{height:100%;background:#07070f}
     #root{height:100%;min-height:100vh}
-    #splash{position:fixed;inset:0;background:radial-gradient(ellipse at 30% 0%,#1a0533 0%,#07070f 60%);display:flex;flex-direction:column;align-items:center;justify-content:center;color:#e0e0e0;font-family:system-ui,sans-serif;z-index:9999;transition:opacity 0.4s ease}
+    #splash{position:fixed;inset:0;background:#07070f;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#e0e0e0;font-family:system-ui,sans-serif;z-index:9999;transition:opacity 0.6s ease;overflow:hidden}
     #splash.hide{opacity:0;pointer-events:none}
-    .sp-icon{font-size:52px;margin-bottom:14px;animation:pulse 2s infinite}
-    .sp-title{font-size:30px;font-weight:800;background:linear-gradient(135deg,#e8e8e8,#9333ea);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:6px}
-    .sp-sub{font-size:11px;letter-spacing:5px;color:#9333ea;text-transform:uppercase;margin-bottom:48px}
-    .sp-dots{display:flex;gap:8px}
-    .sp-dots span{width:8px;height:8px;border-radius:50%;background:#9333ea;animation:bounce 1.2s infinite}
-    .sp-dots span:nth-child(2){animation-delay:.2s}
-    .sp-dots span:nth-child(3){animation-delay:.4s}
+    .sp-bg{position:absolute;inset:0;background:radial-gradient(ellipse 80% 60% at 50% 40%,#1a0533 0%,#07070f 70%)}
+    .sp-orb1{position:absolute;width:320px;height:320px;border-radius:50%;background:radial-gradient(circle,rgba(147,51,234,0.18),transparent 70%);top:-60px;left:-80px;animation:orbFloat 6s ease-in-out infinite}
+    .sp-orb2{position:absolute;width:240px;height:240px;border-radius:50%;background:radial-gradient(circle,rgba(96,239,255,0.08),transparent 70%);bottom:40px;right:-40px;animation:orbFloat 8s ease-in-out infinite reverse}
+    .sp-content{position:relative;z-index:2;display:flex;flex-direction:column;align-items:center}
+    .sp-logo{width:72px;height:72px;border-radius:20px;background:linear-gradient(135deg,#3b0764,#1e0040);border:1px solid rgba(147,51,234,0.4);display:flex;align-items:center;justify-content:center;font-size:34px;margin-bottom:24px;box-shadow:0 0 40px rgba(147,51,234,0.3),0 0 80px rgba(147,51,234,0.1);animation:logoIn 0.7s cubic-bezier(0.34,1.56,0.64,1) both}
+    .sp-wordmark{display:flex;flex-direction:column;align-items:center;margin-bottom:40px;animation:fadeUp 0.6s 0.3s ease both}
+    .sp-title{font-size:28px;font-weight:800;letter-spacing:6px;background:linear-gradient(135deg,#ffffff,#c084fc);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:5px}
+    .sp-sub{font-size:10px;letter-spacing:4px;color:#7c3aed;text-transform:uppercase;font-weight:600}
+    .sp-tagline{font-size:12px;color:#444;margin-bottom:48px;letter-spacing:0.5px;animation:fadeUp 0.6s 0.5s ease both}
+    .sp-loader{width:180px;display:flex;flex-direction:column;align-items:center;gap:10px;animation:fadeUp 0.6s 0.7s ease both}
+    .sp-bar-track{width:100%;height:2px;background:rgba(255,255,255,0.06);border-radius:2px;overflow:hidden}
+    .sp-bar-fill{height:100%;background:linear-gradient(90deg,#7c3aed,#c084fc);border-radius:2px;animation:barLoad 3s cubic-bezier(0.4,0,0.2,1) forwards}
+    .sp-status{font-size:10px;color:#555;letter-spacing:1px}
+    @keyframes logoIn{0%{opacity:0;transform:scale(0.5) rotate(-10deg)}100%{opacity:1;transform:scale(1) rotate(0deg)}}
+    @keyframes fadeUp{0%{opacity:0;transform:translateY(16px)}100%{opacity:1;transform:translateY(0)}}
+    @keyframes orbFloat{0%,100%{transform:translate(0,0)}50%{transform:translate(20px,-20px)}}
+    @keyframes barLoad{0%{width:0%}60%{width:75%}85%{width:92%}100%{width:100%}}
     @keyframes bounce{0%,80%,100%{transform:scale(0.6);opacity:0.4}40%{transform:scale(1);opacity:1}}
     @keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.08)}}
   </style>
 </head>
 <body>
   <div id="splash">
-    <div class="sp-icon">◈</div>
-    <div class="sp-title">NORTHGATE</div>
-    <div class="sp-sub">Sales Network</div>
-    <div class="sp-dots"><span></span><span></span><span></span></div>
+    <div class="sp-bg"></div>
+    <div class="sp-orb1"></div>
+    <div class="sp-orb2"></div>
+    <div class="sp-content">
+      <div class="sp-logo">◈</div>
+      <div class="sp-wordmark">
+        <div class="sp-title">NORTHGATE</div>
+        <div class="sp-sub">Sales Network</div>
+      </div>
+      <div class="sp-tagline">Grow together, earn together</div>
+      <div class="sp-loader">
+        <div class="sp-bar-track"><div class="sp-bar-fill"></div></div>
+        <div class="sp-status">Memuat sistem...</div>
+      </div>
+    </div>
   </div>
   <div id="root"></div>
 
@@ -45,7 +66,7 @@
 
   <script>
     function hideSplash(){var s=document.getElementById('splash');if(s){s.classList.add('hide');setTimeout(function(){s.style.display='none'},500);}}
-    setTimeout(hideSplash,15000);
+    setTimeout(hideSplash,3500);
     if('serviceWorker' in navigator){window.addEventListener('load',function(){navigator.serviceWorker.register('sw.js').catch(function(){});});}
   </script>
 
@@ -99,12 +120,12 @@ const DB = {
     { id:"admin", username:"Northgate", password:"0825",   role:"admin",
       lbp:9999, sales:0,  stock:0,   wallet:0, soldToday:0,
       joinDate:"2024-01-01", memberCard:null, ownedCards:[], setoran:0, withdrawn:0,
-      stockRequests:[], lbpHistory:[], salesHistory:[], referralCode:"ADMIN00",
+      orders:[], lbpHistory:[], salesHistory:[], referralCode:"ADMIN00",
       referredBy:null, referrals:[], monthlySales:0, avatar:null },
     { id:"gopal", username:"Gopal",     password:"010101", role:"user",
       lbp:2500, sales:87, stock:120, wallet:1609500, soldToday:5,
       joinDate:"2025-06-15", memberCard:null, ownedCards:[], setoran:1870500, withdrawn:0,
-      stockRequests:[], lbpHistory:[
+      orders:[], withdrawHistory:[], lbpHistory:[
         {type:"earn",amount:435,desc:"87 produk terjual",date:"2026-03-01"},
         {type:"earn",amount:20,desc:"Bonus signup",date:"2025-06-15"},
       ], salesHistory:[
@@ -1062,6 +1083,8 @@ function App() {
   const [formSold,  setFormSold]  = useState("");
   const [formStock, setFormStock] = useState("");
   const [formWd,    setFormWd]    = useState("");
+  const [wdMethod,  setWdMethod]  = useState("transfer");
+  const [wdAccount, setWdAccount] = useState("");
   const [lbpConv,   setLbpConv]   = useState("");
 
   const showToast = (t,m,dur=3000)=>{ setToast({t,m}); setTimeout(()=>setToast(null),dur); };
@@ -1102,7 +1125,7 @@ function App() {
       lbp:settings.newUserBonus, sales:0, stock:100, wallet:0, soldToday:0,
       joinDate:new Date().toISOString().split("T")[0], memberCard:null, ownedCards:[],
       miningFrags:0, miningRig:0, miningHistory:[],
-      setoran:0, withdrawn:0, stockRequests:[],
+      setoran:0, withdrawn:0, orders:[], withdrawHistory:[],
       lbpHistory:[{type:"earn",amount:settings.newUserBonus,desc:"Bonus signup",date:new Date().toLocaleDateString("id-ID")}],
       salesHistory:[], referralCode:code, referredBy:referrerId, referrals:[], monthlySales:0, avatar:null
     };
@@ -1120,61 +1143,157 @@ function App() {
 
   const logout = ()=>{ setCurrentUser(null); setScreen("login"); setLUser(""); setLPass(""); setLErr(""); setSubPanel(null); setAdminSub(null); };
 
-  // ── Sell logic ───────────────────────────────────────────────────────────────
-  const submitSales = () => {
-    const sold  = parseInt(formSold)||0;
-    const stock = parseInt(formStock)||0;
-    if(sold<0||stock<0){showToast("e","Nilai tidak boleh negatif!"); return;}
-    if(sold>0&&sold>currentUser.stock){showToast("e","Unit melebihi stok tersedia!"); return;}
-    
-    const myCard   = MEMBER_CARDS.find(c=>c.id===currentUser.memberCard);
-    const lbpGain  = (LBP_BASE_PER_SALE + (myCard?.lbpBonus||0)) * sold;
-    const profit   = PROFIT_PER_PRODUK * sold;
-    const setorAuto= SETORAN_PER_PRODUK * sold;
-    const reqs     = stock>0?[...(currentUser.stockRequests||[]),{qty:stock,date:new Date().toLocaleDateString("id-ID"),status:"Menunggu"}]:(currentUser.stockRequests||[]);
-    const today    = new Date().toLocaleDateString("id-ID");
-    
-    // Add to LBP history
-    const newLbpHistory = sold>0 ? [...(currentUser.lbpHistory||[]),{type:"earn",amount:lbpGain,desc:`${sold} produk terjual`,date:today}] : (currentUser.lbpHistory||[]);
-    // Add to sales history
-    const newSalesHistory = sold>0 ? [...(currentUser.salesHistory||[]),{qty:sold,profit,lbp:lbpGain,date:today}] : (currentUser.salesHistory||[]);
-    
-    updateUser(currentUser.id,{
-      stock:         currentUser.stock - sold,
-      sales:         currentUser.sales + sold,
-      soldToday:     currentUser.soldToday + sold,
-      monthlySales:  (currentUser.monthlySales||0) + sold,
-      wallet:        (currentUser.wallet||0) + profit,
-      lbp:           currentUser.lbp + lbpGain,
-      setoran:       (currentUser.setoran||0) + setorAuto,
-      stockRequests: reqs,
-      lbpHistory:    newLbpHistory,
-      salesHistory:  newSalesHistory,
+  // ── Order flow helpers ───────────────────────────────────────────────────────
+  // STEP 1: Sales konfirmasi order ke admin
+  const submitOrder = () => {
+    const qty = parseInt(formSold)||0;
+    if(qty <= 0){ showToast("e","Masukkan jumlah unit!"); return; }
+    if(qty > currentUser.stock){ showToast("e",`Stok tidak cukup! Tersedia: ${currentUser.stock}`); return; }
+    const today = new Date().toLocaleDateString("id-ID");
+    const time  = new Date().toLocaleTimeString("id-ID",{hour:"2-digit",minute:"2-digit"});
+    const myCard= MEMBER_CARDS.find(c=>c.id===currentUser.memberCard);
+    const lbpGain = (LBP_BASE_PER_SALE+(myCard ? myCard.lbpBonus : 0))*qty;
+    const profit  = PROFIT_PER_PRODUK*qty;
+    const setoran = SETORAN_PER_PRODUK*qty;
+    const order = {
+      id:    Date.now().toString(),
+      qty,
+      lbpGain,
+      profit,
+      setoran,
+      date:  today,
+      time,
+      status:"pending",   // pending → approved
+    };
+    updateUser(currentUser.id,{ orders:[order,...(currentUser.orders||[])] });
+    setFormSold("");
+    showToast("s",`✓ Order ${qty} unit dikirim ke admin!`);
+  };
+
+  // STEP 2: Admin approve → stok berkurang, profit + LBP masuk
+  const approveOrder = (userId, orderId) => {
+    const user  = users.find(u=>u.id===userId);
+    if(!user) return;
+    const order = (user.orders||[]).find(o=>o.id===orderId);
+    if(!order || order.status!=="pending") return;
+    const today = new Date().toLocaleDateString("id-ID");
+
+    const newOrders = (user.orders||[]).map(o=>
+      o.id===orderId ? {...o, status:"approved", approvedDate:today} : o
+    );
+    const newLbpHist = [
+      {type:"earn", amount:order.lbpGain, desc:`${order.qty} produk terjual (approved)`, date:today},
+      ...(user.lbpHistory||[])
+    ].slice(0,50);
+    const newSalesHist = [
+      {qty:order.qty, profit:order.profit, lbp:order.lbpGain, date:today},
+      ...(user.salesHistory||[])
+    ].slice(0,50);
+
+    updateUser(userId,{
+      orders:       newOrders,
+      stock:        (user.stock||0) - order.qty,
+      sales:        (user.sales||0) + order.qty,
+      soldToday:    (user.soldToday||0) + order.qty,
+      monthlySales: (user.monthlySales||0) + order.qty,
+      wallet:       (user.wallet||0) + order.profit,
+      lbp:          (user.lbp||0) + order.lbpGain,
+      setoran:      (user.setoran||0) + order.setoran,
+      lbpHistory:   newLbpHist,
+      salesHistory: newSalesHist,
     });
 
-    // Referral bonus: if this is user's first ever sale, reward referrer
-    if(currentUser.sales===0 && sold>0 && currentUser.referredBy) {
-      const referrer = users.find(u=>u.id===currentUser.referredBy);
-      if(referrer) {
-        const refCard = MEMBER_CARDS.find(c=>c.id===referrer.memberCard);
-        const refBonus = REFERRAL_LBP_BONUS + Math.round(REFERRAL_LBP_BONUS*(refCard?.referralPct||0)/100);
-        const refHistory = [...(referrer.lbpHistory||[]),{type:"referral",amount:refBonus,desc:`Referral: ${currentUser.username} jual pertama`,date:today}];
-        updateUser(referrer.id,{lbp:referrer.lbp+refBonus,lbpHistory:refHistory});
+    // Referral bonus on first-ever sale
+    if((user.sales||0)===0 && user.referredBy) {
+      const referrer = users.find(u=>u.id===user.referredBy);
+      if(referrer){
+        const refCard  = MEMBER_CARDS.find(c=>c.id===referrer.memberCard);
+        const refBonus = REFERRAL_LBP_BONUS + Math.round(REFERRAL_LBP_BONUS*(refCard ? refCard.referralPct : 0)/100);
+        const refHist  = [{type:"referral",amount:refBonus,desc:`Referral: ${user.username} jual pertama`,date:today},...(referrer.lbpHistory||[])].slice(0,50);
+        updateUser(referrer.id,{lbp:(referrer.lbp||0)+refBonus, lbpHistory:refHist});
       }
     }
+    showToast("s",`✅ Order ${order.qty} unit diapprove! Profit + LBP masuk.`);
+  };
+
+  // Bulk approve all pending orders for a user
+  const approveAllOrders = (userId) => {
+    const user = users.find(u=>u.id===userId);
+    if(!user) return;
+    const pending = (user.orders||[]).filter(o=>o.status==="pending");
+    if(!pending.length){ showToast("e","Tidak ada order pending!"); return; }
+    pending.forEach(o => approveOrder(userId, o.id));
+  };
+
+  // Dummy — kept for backward compat references (no-op)
+  const submitSales = () => {};
 
     showToast("s",`${sold>0?`${sold} unit terjual! +${lbpGain} LBP, +${fmt(profit)} wallet. `:""}${stock>0?`Permintaan ${stock} stok dikirim.`:""}`);
     setFormSold(""); setFormStock(""); setSubPanel(null);
   };
 
+  // ── Withdraw flow ─────────────────────────────────────────────────────────
+  // User submits request → status "pending" → admin approve/reject
   const submitWithdraw = () => {
-    const amt = parseInt(formWd)||0;
-    const w   = currentUser.wallet||0;
-    if(amt<=0){showToast("e","Masukkan jumlah yang valid!"); return;}
-    if(amt>w){showToast("e",`Saldo tidak cukup! Maks ${fmt(w)}`); return;}
-    updateUser(currentUser.id,{wallet:w-amt,withdrawn:(currentUser.withdrawn||0)+amt});
-    showToast("s",`Withdraw ${fmt(amt)} berhasil diajukan!`);
-    setFormWd(""); setSubPanel(null);
+    const amt    = parseInt(formWd)||0;
+    const wallet = currentUser.wallet||0;
+    const method = wdMethod||"transfer";
+    const acc    = wdAccount.trim();
+    if(amt<=0){ showToast("e","Masukkan jumlah withdraw!"); return; }
+    if(amt<10000){ showToast("e","Minimum withdraw Rp 10.000"); return; }
+    if(amt>wallet){ showToast("e",`Saldo tidak cukup! Maks ${fmt(wallet)}`); return; }
+    if(!acc){ showToast("e","Masukkan nomor rekening / akun!"); return; }
+    const today = new Date().toLocaleDateString("id-ID");
+    const time  = new Date().toLocaleTimeString("id-ID",{hour:"2-digit",minute:"2-digit"});
+    const entry = {
+      id:      Date.now().toString(),
+      amount:  amt,
+      method,
+      account: acc,
+      date:    today,
+      time,
+      status:  "pending",   // pending | approved | rejected
+      note:    "",
+    };
+    updateUser(currentUser.id,{
+      wallet:          wallet - amt,
+      withdrawHistory: [entry,...(currentUser.withdrawHistory||[])].slice(0,50),
+    });
+    showToast("s","✅ Permintaan withdraw dikirim! Menunggu konfirmasi admin.");
+    setFormWd(""); setWdAccount(""); setSubPanel(null);
+  };
+
+  // Admin: approve withdraw
+  const approveWithdraw = (userId, wdId) => {
+    const user = users.find(u=>u.id===userId);
+    if(!user) return;
+    const entry = (user.withdrawHistory||[]).find(w=>w.id===wdId);
+    if(!entry||entry.status!=="pending") return;
+    const today = new Date().toLocaleDateString("id-ID");
+    const newHist = (user.withdrawHistory||[]).map(w=>
+      w.id===wdId ? {...w, status:"approved", approvedDate:today} : w
+    );
+    updateUser(userId,{
+      withdrawn:       (user.withdrawn||0)+entry.amount,
+      withdrawHistory: newHist,
+    });
+    showToast("s",`✅ Withdraw ${fmt(entry.amount)} untuk ${user.username} disetujui!`);
+  };
+
+  // Admin: reject withdraw → refund wallet
+  const rejectWithdraw = (userId, wdId, noteText) => {
+    const user = users.find(u=>u.id===userId);
+    if(!user) return;
+    const entry = (user.withdrawHistory||[]).find(w=>w.id===wdId);
+    if(!entry||entry.status!=="pending") return;
+    const newHist = (user.withdrawHistory||[]).map(w=>
+      w.id===wdId ? {...w, status:"rejected", note:noteText||"Ditolak admin"} : w
+    );
+    updateUser(userId,{
+      wallet:          (user.wallet||0)+entry.amount,
+      withdrawHistory: newHist,
+    });
+    showToast("s",`Withdraw ${fmt(entry.amount)} ditolak, saldo dikembalikan.`);
   };
 
   const submitLbpConvert = () => {
@@ -1318,34 +1437,50 @@ function App() {
                 </div>
               ))}</Card>}
             <div style={{height:12}}/>
-            <SecTitle>Permintaan Stok</SecTitle>
-            {(u.stockRequests||[]).length===0
-              ?<Card><div style={{textAlign:"center",color:"#444",fontSize:13,padding:"10px 0"}}>Belum ada permintaan stok</div></Card>
-              :<>
-                {(u.stockRequests||[]).filter(r=>r.status==="Menunggu").length>1&&(
-                  <Btn variant="success" small style={{marginBottom:10}} onClick={()=>{
-                    const newReqs=(u.stockRequests||[]).map(r=>r.status==="Menunggu"?{...r,status:"Selesai"}:r);
-                    const totalQty=u.stockRequests.filter(r=>r.status==="Menunggu").reduce((s,r)=>s+r.qty,0);
-                    updateUser(u.id,{stock:(u.stock||0)+totalQty,stockRequests:newReqs});
-                    showToast("s",`Semua stok disetujui! +${totalQty} unit`);
-                  }}>✓ Approve Semua yang Menunggu</Btn>
+            <SecTitle>Order Masuk</SecTitle>
+            {(()=>{
+              const pending = (u.orders||[]).filter(o=>o.status==="pending");
+              const done    = (u.orders||[]).filter(o=>o.status==="approved");
+              return (<>
+                {pending.length>1&&(
+                  <Btn variant="success" small style={{marginBottom:10}} onClick={()=>approveAllOrders(u.id)}>
+                    ✓ Approve Semua ({pending.length} order)
+                  </Btn>
                 )}
-                <Card>{(u.stockRequests||[]).slice().reverse().map((r2,i)=>(
-                  <div key={i} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 0",borderBottom:"1px solid rgba(255,255,255,0.05)"}}>
-                    <div><div style={{fontSize:13,fontWeight:600}}>+{r2.qty} unit</div><div style={{fontSize:11,color:"#555"}}>{r2.date}</div></div>
-                    <div style={{display:"flex",gap:8,alignItems:"center"}}>
-                      <span style={{fontSize:11,fontWeight:700,color:r2.status==="Menunggu"?"#ffd700":"#4ade80",background:r2.status==="Menunggu"?"rgba(255,215,0,0.1)":"rgba(74,222,128,0.1)",border:`1px solid ${r2.status==="Menunggu"?"rgba(255,215,0,0.3)":"rgba(74,222,128,0.3)"}`,borderRadius:20,padding:"3px 10px"}}>{r2.status}</span>
-                      {r2.status==="Menunggu"&&<button onClick={()=>{
-                        const idx=u.stockRequests.length-1-i;
-                        const newReqs=[...(u.stockRequests||[])]; newReqs[idx]={...newReqs[idx],status:"Selesai"};
-                        updateUser(u.id,{stock:(u.stock||0)+r2.qty,stockRequests:newReqs});
-                        showToast("s",`Stok +${r2.qty} unit untuk ${u.username} disetujui!`);
-                      }} style={{background:"rgba(74,222,128,0.12)",border:"1px solid rgba(74,222,128,0.3)",borderRadius:8,padding:"5px 12px",color:"#4ade80",fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:ff}}>✓ Setujui</button>}
+                {pending.length===0&&done.length===0&&(
+                  <Card><div style={{textAlign:"center",color:"#444",fontSize:13,padding:"10px 0"}}>Belum ada order masuk</div></Card>
+                )}
+                {pending.length>0&&<>
+                  <div style={{fontSize:10,fontWeight:700,color:"#ffd700",letterSpacing:1,marginBottom:6}}>⏳ PENDING ({pending.length})</div>
+                  <Card style={{marginBottom:10}}>{pending.map((o,i)=>(
+                    <div key={o.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 0",borderBottom:i<pending.length-1?"1px solid rgba(255,255,255,0.05)":"none"}}>
+                      <div>
+                        <div style={{fontSize:13,fontWeight:700}}>{o.qty} unit</div>
+                        <div style={{fontSize:11,color:"#555"}}>{o.date} · {o.time||""}</div>
+                        <div style={{fontSize:11,color:"#888",marginTop:2}}>
+                          Stok berkurang {o.qty} · Profit {fmt(o.profit)} · +{o.lbpGain} LBP
+                        </div>
+                      </div>
+                      <button onClick={()=>approveOrder(u.id, o.id)} style={{background:"linear-gradient(135deg,#16a34a,#15803d)",border:"none",borderRadius:10,padding:"7px 14px",color:"#fff",fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:ff,flexShrink:0,boxShadow:"0 2px 8px rgba(22,163,74,0.3)"}}>
+                        ✓ Approve
+                      </button>
                     </div>
-                  </div>
-                ))}</Card>
-              </>
-            }
+                  ))}</Card>
+                </>}
+                {done.length>0&&<>
+                  <div style={{fontSize:10,fontWeight:700,color:"#4ade80",letterSpacing:1,marginBottom:6}}>✅ APPROVED ({done.length})</div>
+                  <Card>{done.slice(0,5).map((o,i)=>(
+                    <div key={o.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 0",borderBottom:i<Math.min(done.length,5)-1?"1px solid rgba(255,255,255,0.05)":"none"}}>
+                      <div>
+                        <div style={{fontSize:12,fontWeight:600,color:"#888"}}>{o.qty} unit · {o.approvedDate||o.date}</div>
+                        <div style={{fontSize:11,color:"#4ade80"}}>+{fmt(o.profit)} · +{o.lbpGain} LBP masuk</div>
+                      </div>
+                      <span style={{fontSize:10,color:"#4ade80",background:"rgba(74,222,128,0.1)",border:"1px solid rgba(74,222,128,0.25)",borderRadius:20,padding:"2px 10px",flexShrink:0}}>Done</span>
+                    </div>
+                  ))}</Card>
+                </>}
+              </>);
+            })()}
             <div style={{height:16}}/>
           </div>
         </div>
@@ -1354,40 +1489,100 @@ function App() {
       if(panel==="wallet") return (
         <div style={pageStyle}>
           <Toast msg={toast}/>
-          <BackHeader title={`Wallet — ${u.username}`} sub="Admin · Keuangan User" accent="#c084fc" onBack={()=>setAdminSub(null)}/>
-          <div style={{padding:"20px 16px"}}>
-            <Card style={{marginBottom:12,background:"linear-gradient(135deg,rgba(147,51,234,0.15),transparent)",border:"1px solid rgba(147,51,234,0.3)"}}>
-              <div style={{fontSize:11,color:"#888",fontWeight:700,letterSpacing:1,textTransform:"uppercase",marginBottom:8}}>Saldo Wallet</div>
+          <BackHeader title={`Withdraw — ${u.username}`} sub="Admin · Kelola Penarikan" accent="#c084fc" onBack={()=>setAdminSub(null)}/>
+          <div style={{padding:"16px 16px 24px"}}>
+
+            {/* Balance header */}
+            <div style={{background:"linear-gradient(135deg,rgba(124,58,237,0.15),rgba(192,132,252,0.05))",border:"1px solid rgba(192,132,252,0.2)",borderRadius:18,padding:"18px 20px",marginBottom:14}}>
+              <div style={{fontSize:10,color:"#888",fontWeight:700,letterSpacing:2,textTransform:"uppercase",marginBottom:6}}>SALDO {u.username.toUpperCase()}</div>
               <div style={{fontSize:36,fontWeight:800,color:"#c084fc"}}>{fmtK(u.wallet||0)}</div>
-              <div style={{fontSize:12,color:"#666",marginTop:4}}>{fmt(u.wallet||0)}</div>
-            </Card>
-            <SecTitle>Detail Keuangan</SecTitle>
-            <Card style={{marginBottom:16}}>
-              <InfoRow label="Total Omzet" value={fmt(u.sales*HARGA_JUAL)} color="#e0e0e0"/>
-              <InfoRow label="Total Setoran Diterima" value={fmt(u.setoran||0)} color="#ef4444"/>
-              <InfoRow label="Total Profit User" value={fmt(u.sales*PROFIT_PER_PRODUK)} color="#4ade80"/>
-              <InfoRow label="Sudah Withdraw" value={fmt(u.withdrawn||0)} color="#a78bfa"/>
-              <InfoRow label="Saldo Saat Ini" value={fmt(u.wallet||0)} color="#c084fc" border={false}/>
-            </Card>
-            <SecTitle>Tambah / Kurangi Saldo</SecTitle>
-            <Card style={{marginBottom:16}}>
-              <div style={{display:"flex",gap:10,marginBottom:12}}>
+              <div style={{display:"flex",gap:16,marginTop:12}}>
+                {[{l:"Total Profit",v:fmt(u.sales*PROFIT_PER_PRODUK),c:"#4ade80"},{l:"Sudah Ditarik",v:fmt(u.withdrawn||0),c:"#a78bfa"},{l:"Pending",v:fmt((u.withdrawHistory||[]).filter(w=>w.status==="pending").reduce((s,w)=>s+w.amount,0)),c:"#ffd700"}].map(x=>(
+                  <div key={x.l}><div style={{fontSize:9,color:"#555",marginBottom:2}}>{x.l}</div><div style={{fontSize:11,fontWeight:700,color:x.c}}>{x.v}</div></div>
+                ))}
+              </div>
+            </div>
+
+            {/* Pending withdrawals */}
+            {(()=>{
+              const pending = (u.withdrawHistory||[]).filter(w=>w.status==="pending");
+              const WD_ICONS = {transfer:"🏦",dana:"💙",gopay:"💚",ovo:"💜"};
+              const WD_LABELS = {transfer:"Transfer Bank",dana:"DANA",gopay:"GoPay",ovo:"OVO"};
+              return (<>
+                {pending.length>0&&(
+                  <div style={{marginBottom:14}}>
+                    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
+                      <div style={{fontSize:10,fontWeight:700,color:"#ffd700",letterSpacing:2,textTransform:"uppercase"}}>PENDING ({pending.length})</div>
+                      {pending.length>1&&<button onClick={()=>pending.forEach(w=>approveWithdraw(u.id,w.id))} style={{background:"rgba(74,222,128,0.12)",border:"1px solid rgba(74,222,128,0.25)",borderRadius:8,padding:"4px 12px",color:"#4ade80",fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:ff}}>Approve Semua</button>}
+                    </div>
+                    {pending.map(w=>(
+                      <div key={w.id} style={{background:"rgba(255,215,0,0.04)",border:"1px solid rgba(255,215,0,0.15)",borderRadius:14,padding:"14px 16px",marginBottom:8}}>
+                        <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",marginBottom:10}}>
+                          <div style={{display:"flex",alignItems:"center",gap:10}}>
+                            <div style={{width:38,height:38,borderRadius:10,background:"rgba(255,215,0,0.1)",border:"1px solid rgba(255,215,0,0.2)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18}}>{WD_ICONS[w.method]||"💸"}</div>
+                            <div>
+                              <div style={{fontSize:15,fontWeight:800,color:"#ffd700"}}>{fmt(w.amount)}</div>
+                              <div style={{fontSize:11,color:"#666"}}>{WD_LABELS[w.method]||w.method} · {w.account}</div>
+                              <div style={{fontSize:10,color:"#444"}}>{w.date} {w.time||""}</div>
+                            </div>
+                          </div>
+                          <span style={{fontSize:9,fontWeight:700,color:"#ffd700",background:"rgba(255,215,0,0.1)",border:"1px solid rgba(255,215,0,0.2)",borderRadius:20,padding:"3px 9px",whiteSpace:"nowrap"}}>Pending</span>
+                        </div>
+                        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                          <button onClick={()=>approveWithdraw(u.id,w.id)} style={{background:"linear-gradient(135deg,#16a34a,#15803d)",border:"none",borderRadius:10,padding:"10px",color:"#fff",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:ff,boxShadow:"0 2px 10px rgba(22,163,74,0.3)"}}>✓ Approve</button>
+                          <button onClick={()=>rejectWithdraw(u.id,w.id,"Ditolak admin")} style={{background:"rgba(239,68,68,0.1)",border:"1px solid rgba(239,68,68,0.25)",borderRadius:10,padding:"10px",color:"#ef4444",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:ff}}>✗ Tolak</button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {pending.length===0&&<div style={{background:"rgba(74,222,128,0.04)",border:"1px solid rgba(74,222,128,0.1)",borderRadius:12,padding:"12px 16px",marginBottom:14,display:"flex",alignItems:"center",gap:8}}><span style={{fontSize:16}}>✅</span><span style={{fontSize:12,color:"#4ade80"}}>Tidak ada withdraw pending</span></div>}
+
+                {/* Approved/rejected history */}
+                {(u.withdrawHistory||[]).filter(w=>w.status!=="pending").length>0&&(
+                  <div>
+                    <div style={{fontSize:10,fontWeight:700,color:"#555",letterSpacing:2,textTransform:"uppercase",marginBottom:8}}>RIWAYAT</div>
+                    <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                      {(u.withdrawHistory||[]).filter(w=>w.status!=="pending").slice(0,6).map(w=>{
+                        const isOk = w.status==="approved";
+                        const sc   = isOk?"#4ade80":"#ef4444";
+                        return (
+                          <div key={w.id} style={{background:"rgba(255,255,255,0.02)",border:"1px solid rgba(255,255,255,0.05)",borderRadius:12,padding:"12px 14px",display:"flex",alignItems:"center",gap:10}}>
+                            <div style={{width:34,height:34,borderRadius:10,background:`${sc}10`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,flexShrink:0}}>{WD_ICONS[w.method]||"💸"}</div>
+                            <div style={{flex:1}}>
+                              <div style={{fontSize:13,fontWeight:700,color:"#e0e0e0"}}>{fmt(w.amount)}</div>
+                              <div style={{fontSize:10,color:"#555"}}>{w.date} · {WD_LABELS[w.method]||w.method} · {w.account}</div>
+                            </div>
+                            <span style={{fontSize:10,fontWeight:700,color:sc,background:`${sc}10`,border:`1px solid ${sc}20`,borderRadius:20,padding:"3px 9px",flexShrink:0}}>{isOk?"Done":"Tolak"}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </>);
+            })()}
+
+            {/* Manual adjust */}
+            <div style={{marginTop:16,paddingTop:16,borderTop:"1px solid rgba(255,255,255,0.05)"}}>
+              <div style={{fontSize:10,fontWeight:700,color:"#555",letterSpacing:2,textTransform:"uppercase",marginBottom:10}}>ADJUSTMENT MANUAL</div>
+              <div style={{display:"flex",gap:8,marginBottom:8}}>
                 <input type="number" inputMode="numeric" placeholder="Nominal (Rp)"
                   value={lbpEdit[`w_${u.id}`]||""} onChange={e=>setLbpEdit(p=>({...p,[`w_${u.id}`]:e.target.value}))}
-                  style={{flex:1,background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:10,padding:"12px 14px",color:"#e0e0e0",fontSize:16,outline:"none",fontFamily:ff,WebkitAppearance:"none"}}/>
-              </div>
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-                <Btn variant="success" small onClick={()=>{
-                  const v=parseInt(lbpEdit[`w_${u.id}`])||0;
-                  if(v>0){updateUser(u.id,{wallet:(u.wallet||0)+v}); showToast("s",`+${fmt(v)} ke wallet ${u.username}`); setLbpEdit(p=>({...p,[`w_${u.id}`]:""}));}
+                  style={{flex:1,background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:10,padding:"11px 14px",color:"#e0e0e0",fontSize:14,outline:"none",fontFamily:ff}}/>
+                <Btn small variant="success" onClick={()=>{
+                  const v=parseInt(lbpEdit[`w_${u.id}`])||0; if(v<=0) return;
+                  updateUser(u.id,{wallet:(u.wallet||0)+v});
+                  setLbpEdit(p=>({...p,[`w_${u.id}`]:""}));
+                  showToast("s",`+${fmt(v)} ditambah ke wallet ${u.username}`);
                 }}>+ Tambah</Btn>
-                <Btn variant="danger" small onClick={()=>{
-                  const v=parseInt(lbpEdit[`w_${u.id}`])||0;
-                  if(v>0&&v<=(u.wallet||0)){updateUser(u.id,{wallet:(u.wallet||0)-v}); showToast("s",`–${fmt(v)} dari wallet ${u.username}`); setLbpEdit(p=>({...p,[`w_${u.id}`]:""}));}
+                <Btn small onClick={()=>{
+                  const v=parseInt(lbpEdit[`w_${u.id}`])||0; if(v<=0) return;
+                  if(v<=(u.wallet||0)){ updateUser(u.id,{wallet:(u.wallet||0)-v,withdrawn:(u.withdrawn||0)+v}); setLbpEdit(p=>({...p,[`w_${u.id}`]:""})); showToast("s",`–${fmt(v)} dikurangi dari wallet ${u.username}`);}
                   else showToast("e","Nominal melebihi saldo!");
                 }}>– Kurangi</Btn>
               </div>
-            </Card>
+            </div>
           </div>
         </div>
       );
@@ -1568,6 +1763,24 @@ function App() {
                 {(u.referrals||[]).length>0&&<div style={{background:"rgba(34,197,94,0.08)",border:"1px solid rgba(34,197,94,0.2)",borderRadius:10,padding:"7px 12px",marginBottom:12,fontSize:11,color:"#4ade80"}}>
                   👥 {(u.referrals||[]).length} referral · Kode: <span style={{fontWeight:700,letterSpacing:1}}>{u.referralCode}</span>
                 </div>}
+                {(()=>{
+                  const pendingOrders = (u.orders||[]).filter(o=>o.status==="pending").length;
+                  const pendingWd     = (u.withdrawHistory||[]).filter(w=>w.status==="pending").length;
+                  return (<>
+                    {pendingOrders>0&&(
+                      <div style={{background:"rgba(255,215,0,0.06)",border:"1px solid rgba(255,215,0,0.2)",borderRadius:10,padding:"8px 12px",marginBottom:8,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+                        <span style={{fontSize:12,color:"#ffd700",fontWeight:700}}>⏳ {pendingOrders} order pending</span>
+                        <button onClick={()=>setAdminSub({panel:"sales",userId:u.id})} style={{background:"rgba(255,215,0,0.12)",border:"1px solid rgba(255,215,0,0.25)",borderRadius:8,padding:"4px 12px",color:"#ffd700",fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:ff}}>Approve →</button>
+                      </div>
+                    )}
+                    {pendingWd>0&&(
+                      <div style={{background:"rgba(192,132,252,0.06)",border:"1px solid rgba(192,132,252,0.2)",borderRadius:10,padding:"8px 12px",marginBottom:8,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+                        <span style={{fontSize:12,color:"#c084fc",fontWeight:700}}>💸 {pendingWd} withdraw pending</span>
+                        <button onClick={()=>setAdminSub({panel:"wallet",userId:u.id})} style={{background:"rgba(192,132,252,0.12)",border:"1px solid rgba(192,132,252,0.25)",borderRadius:8,padding:"4px 12px",color:"#c084fc",fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:ff}}>Review →</button>
+                      </div>
+                    )}
+                  </>);
+                })()}
                 <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8}}>
                   {[{l:"📈 Penjualan",p:"sales"},{l:"💰 Wallet",p:"wallet"},{l:"✨ LBP",p:"lbp"}].map(x=>(
                     <button key={x.p} onClick={()=>setAdminSub({panel:x.p,userId:u.id})}
@@ -1812,15 +2025,24 @@ function App() {
               <InfoRow label="Profit bersih" value={fmt(PROFIT_PER_PRODUK)} color="#4ade80"/>
               <InfoRow label={<span style={{display:"flex",alignItems:"center",gap:4}}><LBPCoin size={13}/>LBP didapat</span>} value={`${LBP_BASE_PER_SALE+(myCard?.lbpBonus||0)} LBP`} color="#ffd700" border={false}/>
             </div>
-            <Inp label="🛒 Barang Terjual (unit)" type="number" inputMode="numeric" value={formSold} onChange={e=>setFormSold(e.target.value)} placeholder="Contoh: 5"/>
-            {formSold&&parseInt(formSold)>0&&<div style={{background:"rgba(34,197,94,0.08)",border:"1px solid rgba(34,197,94,0.2)",borderRadius:10,padding:"12px 14px",marginBottom:14}}>
-              <InfoRow label="Total harga terjual" value={fmt((parseInt(formSold)||0)*HARGA_JUAL)}/>
-              <InfoRow label="Setoran ke admin" value={`– ${fmt((parseInt(formSold)||0)*SETORAN_PER_PRODUK)}`} color="#ef4444"/>
-              <InfoRow label="Masuk wallet" value={fmt((parseInt(formSold)||0)*PROFIT_PER_PRODUK)} color="#4ade80"/>
-              <InfoRow label={<span style={{display:"flex",alignItems:"center",gap:4}}><LBPCoin size={12}/>LBP didapat</span>} value={`+${(parseInt(formSold)||0)*(LBP_BASE_PER_SALE+(myCard?.lbpBonus||0))} LBP`} color="#ffd700" border={false}/>
+            {/* Flow badge */}
+            <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:14,padding:"8px 12px",background:"rgba(147,51,234,0.06)",borderRadius:10,border:"1px solid rgba(147,51,234,0.15)"}}>
+              {["Customer Order","Sales Konfirm","Admin Approve","Stok & Profit"].map((s,i,a)=>(
+                <React.Fragment key={i}>
+                  <span style={{fontSize:9,fontWeight:700,color:i===1?"#c084fc":"#444",whiteSpace:"nowrap"}}>{s}</span>
+                  {i<a.length-1&&<span style={{fontSize:9,color:"#333"}}>›</span>}
+                </React.Fragment>
+              ))}
+            </div>
+            <Inp label="🛒 Unit Terjual" type="number" inputMode="numeric" value={formSold} onChange={e=>setFormSold(e.target.value)} placeholder="Contoh: 5"/>
+            {formSold&&parseInt(formSold)>0&&<div style={{background:"rgba(34,197,94,0.06)",border:"1px solid rgba(34,197,94,0.2)",borderRadius:10,padding:"12px 14px",marginBottom:14}}>
+              <InfoRow label="Total terjual" value={fmt((parseInt(formSold)||0)*HARGA_JUAL)}/>
+              <InfoRow label="Setoran admin" value={`– ${fmt((parseInt(formSold)||0)*SETORAN_PER_PRODUK)}`} color="#ef4444"/>
+              <InfoRow label="Profit (setelah approve)" value={fmt((parseInt(formSold)||0)*PROFIT_PER_PRODUK)} color="#4ade80"/>
+              <InfoRow label={<span style={{display:"flex",alignItems:"center",gap:4}}><LBPCoin size={12}/>LBP (setelah approve)</span>} value={`+${(parseInt(formSold)||0)*(LBP_BASE_PER_SALE+(myCard ? myCard.lbpBonus : 0))} LBP`} color="#ffd700" border={false}/>
+              <div style={{fontSize:10,color:"#666",marginTop:8,fontStyle:"italic"}}>⏳ Wallet & LBP masuk setelah admin approve</div>
             </div>}
-            <Inp label="📦 Minta Stok Baru (unit, opsional)" type="number" inputMode="numeric" value={formStock} onChange={e=>setFormStock(e.target.value)} placeholder="Contoh: 20"/>
-            <Btn onClick={submitSales}>Kirim Laporan ✓</Btn>
+            <Btn onClick={submitOrder}>📤 Konfirmasi ke Admin</Btn>
           </Card>
           {/* Sales history */}
           {(currentUser.salesHistory||[]).length>0&&<>
@@ -1837,14 +2059,26 @@ function App() {
               ))}
             </Card>
           </>}
-          {(currentUser.stockRequests||[]).length>0&&<>
-            <SecTitle>Riwayat Permintaan Stok</SecTitle>
-            <Card>{(currentUser.stockRequests||[]).slice().reverse().slice(0,5).map((r2,i)=>(
-              <div key={i} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 0",borderBottom:"1px solid rgba(255,255,255,0.05)"}}>
-                <div><div style={{fontSize:13,fontWeight:600}}>+{r2.qty} unit</div><div style={{fontSize:11,color:"#555"}}>{r2.date}</div></div>
-                <span style={{fontSize:11,fontWeight:700,color:r2.status==="Menunggu"?"#ffd700":"#4ade80",background:r2.status==="Menunggu"?"rgba(255,215,0,0.1)":"rgba(74,222,128,0.1)",border:`1px solid ${r2.status==="Menunggu"?"rgba(255,215,0,0.3)":"rgba(74,222,128,0.3)"}`,borderRadius:20,padding:"3px 10px"}}>{r2.status}</span>
-              </div>
-            ))}</Card>
+          {(currentUser.orders||[]).length>0&&<>
+            <SecTitle>Status Order</SecTitle>
+            <Card>{(currentUser.orders||[]).slice(0,8).map((o,i)=>{
+              const isPending = o.status==="pending";
+              return (
+                <div key={o.id||i} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 0",borderBottom:"1px solid rgba(255,255,255,0.05)"}}>
+                  <div>
+                    <div style={{fontSize:13,fontWeight:600}}>{o.qty} unit</div>
+                    <div style={{fontSize:11,color:"#555"}}>{o.date} · {o.time||""}</div>
+                    {!isPending&&<div style={{fontSize:11,color:"#4ade80",marginTop:2}}>+{fmt(o.profit)} · +{o.lbpGain} LBP</div>}
+                  </div>
+                  <span style={{fontSize:11,fontWeight:700,
+                    color:isPending?"#ffd700":"#4ade80",
+                    background:isPending?"rgba(255,215,0,0.1)":"rgba(74,222,128,0.1)",
+                    border:`1px solid ${isPending?"rgba(255,215,0,0.3)":"rgba(74,222,128,0.3)"}`,
+                    borderRadius:20,padding:"3px 10px"
+                  }}>{isPending?"⏳ Pending":"✅ Approved"}</span>
+                </div>
+              );
+            })}</Card>
           </>}
           <div style={{height:16}}/>
         </div>
@@ -1852,41 +2086,170 @@ function App() {
     );
 
     // ── Sub-panel: Wallet ──────────────────────────────────────────────────
-    if(subPanel==="wallet") return (
-      <div style={pageStyle}>
-        <Toast msg={toast}/>
-        <BackHeader title="Panel Wallet" sub="Keuangan" accent="#c084fc" onBack={()=>setSubPanel(null)}/>
-        <div style={{padding:"20px 16px"}}>
-          <Card style={{marginBottom:12,background:"linear-gradient(135deg,rgba(147,51,234,0.15),transparent)",border:"1px solid rgba(147,51,234,0.3)"}}>
-            <div style={{fontSize:11,color:"#888",fontWeight:700,letterSpacing:1,textTransform:"uppercase",marginBottom:8}}>Saldo Wallet (Profit Bersih)</div>
-            <div style={{fontSize:36,fontWeight:800,color:"#c084fc"}}>{fmtK(walletTotal)}</div>
-            <div style={{fontSize:12,color:"#666",marginTop:4}}>{fmt(walletTotal)}</div>
-          </Card>
-          <SecTitle>Struktur Keuangan Per Produk</SecTitle>
-          <Card style={{marginBottom:16}}>
-            <InfoRow label="💵 Harga jual ke customer" value={fmt(HARGA_JUAL)}/>
-            <InfoRow label="⬆ Setoran ke admin (auto)" value={`– ${fmt(SETORAN_PER_PRODUK)}`} color="#ef4444"/>
-            <InfoRow label="✅ Profit bersih kamu" value={fmt(PROFIT_PER_PRODUK)} color="#4ade80" border={false}/>
-          </Card>
-          <SecTitle>Riwayat Keuangan</SecTitle>
-          <Card style={{marginBottom:16}}>
-            <InfoRow label="Total Produk Terjual" value={`${currentUser.sales} unit`} color="#60efff"/>
-            <InfoRow label="Total Setoran ke Admin" value={fmt(currentUser.setoran||0)} color="#ef4444"/>
-            <InfoRow label="Total Profit" value={fmt(currentUser.sales*PROFIT_PER_PRODUK)} color="#4ade80"/>
-            <InfoRow label="Sudah Withdraw" value={fmt(currentUser.withdrawn||0)} color="#a78bfa"/>
-            <InfoRow label="Saldo Saat Ini" value={fmt(walletTotal)} color="#c084fc" border={false}/>
-          </Card>
-          <SecTitle>Tarik Saldo</SecTitle>
-          <Card style={{marginBottom:16}}>
-            <Inp label={`Jumlah Withdraw (Maks. ${fmt(walletTotal)})`} type="number" inputMode="numeric" value={formWd} onChange={e=>setFormWd(e.target.value)} placeholder={`Maks ${fmtK(walletTotal)}`}/>
-            {formWd&&parseInt(formWd)>0&&<div style={{background:"rgba(34,197,94,0.08)",border:"1px solid rgba(34,197,94,0.2)",borderRadius:10,padding:"10px 14px",marginBottom:14,fontSize:12,color:"#4ade80"}}>
-              Sisa setelah withdraw: {fmt(walletTotal-(parseInt(formWd)||0))}
-            </div>}
-            <Btn variant="success" onClick={submitWithdraw}>Ajukan Withdraw ↓</Btn>
-          </Card>
+    if(subPanel==="wallet") {
+      const wdHist     = currentUser.withdrawHistory||[];
+      const pendingWd  = wdHist.filter(w=>w.status==="pending");
+      const hasPending = pendingWd.length>0;
+      const inputAmt   = parseInt(formWd)||0;
+      const WD_METHODS = [
+        {id:"transfer", label:"Transfer Bank",  icon:"🏦", hint:"No. Rekening"},
+        {id:"dana",     label:"DANA",            icon:"💙", hint:"No. HP DANA"},
+        {id:"gopay",    label:"GoPay",           icon:"💚", hint:"No. HP GoPay"},
+        {id:"ovo",      label:"OVO",             icon:"💜", hint:"No. HP OVO"},
+      ];
+      const selMethod = WD_METHODS.find(m=>m.id===wdMethod)||WD_METHODS[0];
+      return (
+        <div style={pageStyle}>
+          <Toast msg={toast}/>
+          {/* Hero header */}
+          <div style={{background:"linear-gradient(160deg,#0d0620 0%,#07070f 100%)",padding:"48px 20px 24px",position:"relative",overflow:"hidden"}}>
+            <div style={{position:"absolute",top:-40,right:-40,width:180,height:180,borderRadius:"50%",background:"radial-gradient(circle,rgba(192,132,252,0.12),transparent 70%)"}}/>
+            <button onClick={()=>setSubPanel(null)} style={{background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:10,padding:"7px 14px",color:"#888",fontSize:12,cursor:"pointer",fontFamily:ff,marginBottom:20,display:"flex",alignItems:"center",gap:6}}>
+              ‹ Kembali
+            </button>
+            <div style={{fontSize:10,color:"#7c3aed",fontWeight:700,letterSpacing:3,textTransform:"uppercase",marginBottom:10}}>WALLET</div>
+            {/* Balance card */}
+            <div style={{background:"linear-gradient(135deg,rgba(124,58,237,0.2),rgba(192,132,252,0.08))",border:"1px solid rgba(192,132,252,0.2)",borderRadius:20,padding:"20px 22px",marginBottom:4}}>
+              <div style={{fontSize:11,color:"#888",fontWeight:600,letterSpacing:1,marginBottom:6}}>SALDO TERSEDIA</div>
+              <div style={{fontSize:40,fontWeight:800,color:"#c084fc",letterSpacing:-1}}>{fmtK(walletTotal)}</div>
+              <div style={{fontSize:12,color:"#666",marginTop:2}}>{fmt(walletTotal)}</div>
+              <div style={{display:"flex",gap:16,marginTop:14}}>
+                <div><div style={{fontSize:10,color:"#555",marginBottom:2}}>Total Profit</div><div style={{fontSize:12,fontWeight:700,color:"#4ade80"}}>{fmtK(currentUser.sales*PROFIT_PER_PRODUK)}</div></div>
+                <div style={{width:1,background:"rgba(255,255,255,0.06)"}}/>
+                <div><div style={{fontSize:10,color:"#555",marginBottom:2}}>Sudah Ditarik</div><div style={{fontSize:12,fontWeight:700,color:"#a78bfa"}}>{fmtK(currentUser.withdrawn||0)}</div></div>
+                <div style={{width:1,background:"rgba(255,255,255,0.06)"}}/>
+                <div><div style={{fontSize:10,color:"#555",marginBottom:2}}>Pending</div><div style={{fontSize:12,fontWeight:700,color:"#ffd700"}}>{fmtK(pendingWd.reduce((s,w)=>s+w.amount,0))}</div></div>
+              </div>
+            </div>
+          </div>
+
+          <div style={{padding:"0 16px 24px"}}>
+            {/* Pending alert */}
+            {hasPending&&(
+              <div style={{background:"rgba(255,215,0,0.06)",border:"1px solid rgba(255,215,0,0.2)",borderRadius:14,padding:"12px 16px",margin:"12px 0",display:"flex",alignItems:"center",gap:10}}>
+                <div style={{fontSize:18}}>⏳</div>
+                <div>
+                  <div style={{fontSize:12,fontWeight:700,color:"#ffd700"}}>Ada {pendingWd.length} permintaan pending</div>
+                  <div style={{fontSize:11,color:"#666",marginTop:2}}>Menunggu konfirmasi admin · {fmt(pendingWd.reduce((s,w)=>s+w.amount,0))}</div>
+                </div>
+              </div>
+            )}
+
+            {/* Withdraw form */}
+            <div style={{marginTop:16}}>
+              <div style={{fontSize:11,fontWeight:700,color:"#888",letterSpacing:2,textTransform:"uppercase",marginBottom:12}}>TARIK SALDO</div>
+
+              {/* Method selector */}
+              <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8,marginBottom:16}}>
+                {WD_METHODS.map(m=>(
+                  <button key={m.id} onClick={()=>setWdMethod(m.id)} style={{background:wdMethod===m.id?"rgba(124,58,237,0.2)":"rgba(255,255,255,0.03)",border:`1px solid ${wdMethod===m.id?"rgba(124,58,237,0.5)":"rgba(255,255,255,0.07)"}`,borderRadius:12,padding:"10px 4px",cursor:"pointer",fontFamily:ff,display:"flex",flexDirection:"column",alignItems:"center",gap:4,transition:"all 0.15s"}}>
+                    <div style={{fontSize:18}}>{m.icon}</div>
+                    <div style={{fontSize:9,fontWeight:700,color:wdMethod===m.id?"#c084fc":"#555",letterSpacing:0.5}}>{m.label}</div>
+                  </button>
+                ))}
+              </div>
+
+              {/* Account input */}
+              <div style={{marginBottom:12}}>
+                <div style={{fontSize:11,color:"#555",marginBottom:6}}>{selMethod.hint}</div>
+                <input
+                  type="text" inputMode="numeric"
+                  value={wdAccount} onChange={e=>setWdAccount(e.target.value)}
+                  placeholder={`Contoh: ${selMethod.id==="transfer"?"1234567890":"08123456789"}`}
+                  style={{width:"100%",background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:12,padding:"13px 16px",color:"#e0e0e0",fontSize:15,outline:"none",fontFamily:ff,boxSizing:"border-box"}}
+                />
+              </div>
+
+              {/* Amount input */}
+              <div style={{marginBottom:12}}>
+                <div style={{fontSize:11,color:"#555",marginBottom:6}}>Jumlah (min. Rp 10.000)</div>
+                <div style={{position:"relative"}}>
+                  <div style={{position:"absolute",left:14,top:"50%",transform:"translateY(-50%)",fontSize:13,color:"#666",fontWeight:600}}>Rp</div>
+                  <input
+                    type="number" inputMode="numeric"
+                    value={formWd} onChange={e=>setFormWd(e.target.value)}
+                    placeholder="0"
+                    style={{width:"100%",background:"rgba(255,255,255,0.05)",border:`1px solid ${inputAmt>walletTotal?"rgba(239,68,68,0.5)":inputAmt>0?"rgba(192,132,252,0.3)":"rgba(255,255,255,0.1)"}`,borderRadius:12,padding:"13px 16px 13px 38px",color:"#e0e0e0",fontSize:18,fontWeight:700,outline:"none",fontFamily:ff,boxSizing:"border-box"}}
+                  />
+                </div>
+              </div>
+
+              {/* Quick amount chips */}
+              <div style={{display:"flex",gap:8,marginBottom:16,flexWrap:"wrap"}}>
+                {[25000,50000,100000,walletTotal].map((v,i)=>(
+                  <button key={i} onClick={()=>setFormWd(String(v))} style={{background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:20,padding:"5px 12px",color:"#888",fontSize:11,fontWeight:600,cursor:"pointer",fontFamily:ff}}>
+                    {i===3?"Semua":fmtK(v)}
+                  </button>
+                ))}
+              </div>
+
+              {/* Summary box */}
+              {inputAmt>=10000&&inputAmt<=walletTotal&&(
+                <div style={{background:"rgba(124,58,237,0.06)",border:"1px solid rgba(124,58,237,0.2)",borderRadius:14,padding:"14px 16px",marginBottom:16}}>
+                  <div style={{display:"flex",justifyContent:"space-between",marginBottom:8}}>
+                    <span style={{fontSize:12,color:"#888"}}>Jumlah ditarik</span>
+                    <span style={{fontSize:13,fontWeight:700,color:"#c084fc"}}>{fmt(inputAmt)}</span>
+                  </div>
+                  <div style={{display:"flex",justifyContent:"space-between",marginBottom:8}}>
+                    <span style={{fontSize:12,color:"#888"}}>Ke {selMethod.label}</span>
+                    <span style={{fontSize:12,color:"#888"}}>{wdAccount||"—"}</span>
+                  </div>
+                  <div style={{height:1,background:"rgba(255,255,255,0.05)",margin:"8px 0"}}/>
+                  <div style={{display:"flex",justifyContent:"space-between"}}>
+                    <span style={{fontSize:12,color:"#555"}}>Sisa saldo</span>
+                    <span style={{fontSize:13,fontWeight:700,color:"#4ade80"}}>{fmt(walletTotal-inputAmt)}</span>
+                  </div>
+                </div>
+              )}
+
+              {inputAmt>walletTotal&&(
+                <div style={{background:"rgba(239,68,68,0.06)",border:"1px solid rgba(239,68,68,0.2)",borderRadius:10,padding:"10px 14px",marginBottom:12,fontSize:12,color:"#ef4444"}}>
+                  ✗ Melebihi saldo tersedia ({fmt(walletTotal)})
+                </div>
+              )}
+
+              <button
+                onClick={submitWithdraw}
+                disabled={inputAmt<10000||inputAmt>walletTotal||!wdAccount.trim()}
+                style={{width:"100%",background:inputAmt>=10000&&inputAmt<=walletTotal&&wdAccount.trim()?"linear-gradient(135deg,#7c3aed,#9333ea)":"rgba(255,255,255,0.05)",border:"none",borderRadius:14,padding:"15px",color:inputAmt>=10000&&inputAmt<=walletTotal&&wdAccount.trim()?"#fff":"#333",fontSize:15,fontWeight:700,cursor:inputAmt>=10000&&inputAmt<=walletTotal&&wdAccount.trim()?"pointer":"not-allowed",fontFamily:ff,transition:"all 0.2s",boxShadow:inputAmt>=10000&&inputAmt<=walletTotal&&wdAccount.trim()?"0 4px 20px rgba(124,58,237,0.35)":"none"}}
+              >
+                Ajukan Withdraw →
+              </button>
+            </div>
+
+            {/* History */}
+            {wdHist.length>0&&(
+              <div style={{marginTop:24}}>
+                <div style={{fontSize:11,fontWeight:700,color:"#888",letterSpacing:2,textTransform:"uppercase",marginBottom:12}}>RIWAYAT WITHDRAW</div>
+                <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                  {wdHist.slice(0,10).map((w,i)=>{
+                    const isPend = w.status==="pending";
+                    const isOk   = w.status==="approved";
+                    const sc     = isPend?"#ffd700":isOk?"#4ade80":"#ef4444";
+                    const sb     = isPend?"rgba(255,215,0,0.08)":isOk?"rgba(74,222,128,0.08)":"rgba(239,68,68,0.08)";
+                    const mIcon  = WD_METHODS.find(m=>m.id===w.method)?.icon||"💸";
+                    return (
+                      <div key={w.id||i} style={{background:"rgba(255,255,255,0.02)",border:"1px solid rgba(255,255,255,0.06)",borderRadius:14,padding:"14px 16px",display:"flex",alignItems:"center",gap:12}}>
+                        <div style={{width:40,height:40,borderRadius:12,background:sb,border:`1px solid ${sc}30`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0}}>{mIcon}</div>
+                        <div style={{flex:1}}>
+                          <div style={{fontSize:13,fontWeight:700,color:"#e0e0e0"}}>{fmt(w.amount)}</div>
+                          <div style={{fontSize:11,color:"#555",marginTop:2}}>{w.date} · {w.time||""} · {WD_METHODS.find(m=>m.id===w.method)?.label||w.method}</div>
+                          <div style={{fontSize:11,color:"#444",marginTop:1}}>{w.account}</div>
+                          {w.note&&<div style={{fontSize:10,color:"#ef4444",marginTop:2}}>{w.note}</div>}
+                        </div>
+                        <span style={{fontSize:10,fontWeight:700,color:sc,background:sb,border:`1px solid ${sc}30`,borderRadius:20,padding:"4px 10px",flexShrink:0,whiteSpace:"nowrap"}}>
+                          {isPend?"⏳ Pending":isOk?"✅ Done":"✗ Ditolak"}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
-      </div>
-    );
+      );
+    }
 
     // ── Sub-panel: LBP ────────────────────────────────────────────────────
     if(subPanel==="lbp") return (
