@@ -111,7 +111,8 @@ const DB = {
         {qty:5,profit:92500,lbp:25,date:"2026-03-06"},
         {qty:12,profit:222000,lbp:60,date:"2026-03-05"},
       ], referralCode:"GOPAL87",
-      referredBy:null, referrals:[], monthlySales:17, avatar:null },
+      referredBy:null, referrals:[], monthlySales:17, avatar:null,
+      miningFrags:0, miningRig:0, miningHistory:[] },
   ],
   chat: {},
   settings: { newUserBonus:20 },
@@ -626,6 +627,405 @@ const AdminChatPanel = ({adminUser, targetUser, chat, setChat, onBack}) => {
   );
 };
 
+// ══════════════════════════════════════════════════════════════════════════════
+//  MINING CONSTANTS
+// ══════════════════════════════════════════════════════════════════════════════
+
+// Base mining rate per tap (LBP fragments) per tier
+const MINING_RATES = {
+  starter: { base:1,   label:"Starter",  color:"#7fff7f", rigBonus:[0,0.5,1.2,2.5,5]   },
+  bronze:  { base:2,   label:"Bronze",   color:"#cd7f32", rigBonus:[0,0.8,1.8,3.5,7]   },
+  silver:  { base:4,   label:"Silver",   color:"#c0c0c0", rigBonus:[0,1.2,2.8,5.5,11]  },
+  gold:    { base:7,   label:"Gold",     color:"#ffd700", rigBonus:[0,2.0,4.5,9,18]     },
+  diamond: { base:12,  label:"Diamond",  color:"#60efff", rigBonus:[0,3.5,7.5,15,30]   },
+  master:  { base:20,  label:"Master",   color:"#ff6bff", rigBonus:[0,6,13,26,52]       },
+};
+
+// Member card multiplier on tap yield
+const CARD_MINE_MULT = { bronze:1.1, silver:1.25, gold:1.5, diamond:2.0, master:3.0 };
+
+// Mining rig upgrades (bought with LBP)
+const MINING_RIGS = [
+  { level:0, name:"Bare Hands",  icon:"✊", cost:0,    desc:"Default — no rig",           color:"#555" },
+  { level:1, name:"Basic Chip",  icon:"🔩", cost:30,   desc:"+bonus fragments per tap",   color:"#4ade80" },
+  { level:2, name:"GPU Rig",     icon:"⚡", cost:80,   desc:"Bigger bonus per tap",        color:"#60efff" },
+  { level:3, name:"ASIC Miner",  icon:"🖥️",cost:200,  desc:"Serious mining power",        color:"#ffd700" },
+  { level:4, name:"Quantum Core",icon:"💠", cost:500,  desc:"Max tier bonus unlocked",     color:"#ff6bff" },
+];
+
+// Price chart config — price in Rp per LBP fragment (fragments → LBP at 100 frags = 1 LBP)
+const FRAGS_PER_LBP   = 100;       // 100 fragments = 1 LBP
+const BASE_FRAG_PRICE = 5;         // base Rp per fragment (5×100=500 = 1 LBP)
+const PRICE_TICK_MS   = 8000;      // price updates every 8s
+const MAX_PRICE_HIST  = 20;        // keep last 20 price points on chart
+
+// ── MINING PRICE ENGINE (shared via window so it survives re-renders) ────────
+if (!window._miningState) {
+  window._miningState = {
+    price:       BASE_FRAG_PRICE,   // current Rp/frag
+    priceHist:   [BASE_FRAG_PRICE], // price history array
+    totalMined:  0,                 // total frags mined by all users this session
+    lastTick:    Date.now(),
+    trend:       0,                 // -1 bear, 0 neutral, 1 bull
+    trendStreak: 0,
+  };
+}
+
+function tickPrice() {
+  const s = window._miningState;
+  // Supply pressure: more mined → price drops slightly
+  const supplyPressure = Math.min(0.3, s.totalMined / 50000);
+  // Random walk component
+  const rand  = (Math.random() - 0.48);   // slight upward bias
+  // Trend momentum
+  if (Math.random() < 0.15) {
+    s.trend       = Math.random() < 0.5 ? 1 : -1;
+    s.trendStreak = Math.floor(Math.random()*4)+1;
+  }
+  if (s.trendStreak > 0) { s.trendStreak--; }
+  const momentum = s.trendStreak > 0 ? s.trend * 0.18 : 0;
+  const delta    = (rand + momentum - supplyPressure * 0.5) * 0.8;
+  s.price        = Math.max(1, Math.min(15, +(s.price + delta).toFixed(2)));
+  s.priceHist    = [...s.priceHist.slice(-MAX_PRICE_HIST + 1), s.price];
+  s.lastTick     = Date.now();
+}
+
+function getMiningTier(lbp) {
+  if (lbp>=2500) return "master";
+  if (lbp>=1000) return "diamond";
+  if (lbp>=500)  return "gold";
+  if (lbp>=250)  return "silver";
+  if (lbp>=100)  return "bronze";
+  return "starter";
+}
+
+function calcTapYield(lbp, memberCard, rigLevel) {
+  const tier     = getMiningTier(lbp);
+  const rateInfo = MINING_RATES[tier];
+  const base     = rateInfo.base;
+  const rigBonus = rateInfo.rigBonus[rigLevel||0];
+  const cardMult = CARD_MINE_MULT[memberCard] || 1.0;
+  return +((base + rigBonus) * cardMult).toFixed(2);
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+//  MINING PANEL COMPONENT
+// ══════════════════════════════════════════════════════════════════════════════
+const MiningPanel = ({ currentUser, onEarn, onBuyRig }) => {
+  const [priceTick,  setPriceTick]  = useState(0);
+  const [fragments,  setFragments]  = useState(currentUser.miningFrags||0);
+  const [popups,     setPopups]     = useState([]);   // floating +X popups
+  const [tapAnim,    setTapAnim]    = useState(false);
+  const [lastNotif,  setLastNotif]  = useState(null); // price alert
+  const [showRigs,   setShowRigs]   = useState(false);
+  const [history,    setHistory]    = useState(currentUser.miningHistory||[]);
+  const tapRef = useRef(null);
+  const prevPrice = useRef(window._miningState.price);
+
+  const rigLevel   = currentUser.miningRig || 0;
+  const tapYield   = calcTapYield(currentUser.lbp, currentUser.memberCard, rigLevel);
+  const tier       = getMiningTier(currentUser.lbp);
+  const tierInfo   = MINING_RATES[tier];
+  const price      = window._miningState.price;
+  const priceHist  = window._miningState.priceHist;
+  const cardMult   = CARD_MINE_MULT[currentUser.memberCard] || 1.0;
+
+  // Price tick timer
+  useEffect(() => {
+    const id = setInterval(() => {
+      const old = window._miningState.price;
+      tickPrice();
+      const newer = window._miningState.price;
+      // Notification if big swing (>15%)
+      if (Math.abs(newer - old) / old > 0.15) {
+        const up = newer > old;
+        setLastNotif({ msg: up ? `📈 Harga naik! Rp${newer.toFixed(1)}/frag` : `📉 Harga turun! Rp${newer.toFixed(1)}/frag`, up });
+        setTimeout(() => setLastNotif(null), 4000);
+      }
+      prevPrice.current = old;
+      setPriceTick(t => t+1);
+    }, PRICE_TICK_MS);
+    return () => clearInterval(id);
+  }, []);
+
+  // Sync fragments to user when leaving
+  useEffect(() => {
+    return () => { onEarn(fragments, history); };
+  }, [fragments, history]);
+
+  const handleTap = (e) => {
+    const gained = tapYield;
+    const newFrags = +(fragments + gained).toFixed(2);
+    setFragments(newFrags);
+    window._miningState.totalMined += gained;
+
+    // Floating popup at tap position
+    const rect = tapRef.current?.getBoundingClientRect();
+    const clientX = e.touches?.[0]?.clientX ?? e.clientX;
+    const clientY = e.touches?.[0]?.clientY ?? e.clientY;
+    const px = rect ? clientX - rect.left : 100;
+    const py = rect ? clientY - rect.top  : 100;
+    const id = Date.now() + Math.random();
+    setPopups(prev => [...prev, { id, x:px, y:py, val:`+${gained}` }]);
+    setTimeout(() => setPopups(prev => prev.filter(p=>p.id!==id)), 900);
+
+    setTapAnim(true);
+    setTimeout(() => setTapAnim(false), 120);
+
+    // Auto-claim if reached 1 LBP worth
+    if (newFrags >= FRAGS_PER_LBP) {
+      const lbpEarned = Math.floor(newFrags / FRAGS_PER_LBP);
+      const remain    = +(newFrags % FRAGS_PER_LBP).toFixed(2);
+      const idrVal    = +(lbpEarned * price * FRAGS_PER_LBP / FRAGS_PER_LBP).toFixed(0); // approx
+      const entry     = { lbp:lbpEarned, frags:lbpEarned*FRAGS_PER_LBP, price:+price.toFixed(2), idr:idrVal, date:new Date().toLocaleDateString("id-ID"), time:new Date().toLocaleTimeString("id-ID",{hour:"2-digit",minute:"2-digit"}) };
+      setHistory(prev => [entry, ...prev].slice(0,30));
+      setFragments(remain);
+      onEarn(remain, [entry, ...history].slice(0,30), lbpEarned);
+    }
+  };
+
+  const claimManual = () => {
+    if (fragments < FRAGS_PER_LBP) return;
+    const lbpEarned = Math.floor(fragments / FRAGS_PER_LBP);
+    const remain    = +(fragments % FRAGS_PER_LBP).toFixed(2);
+    const idrVal    = +(lbpEarned * price * FRAGS_PER_LBP / FRAGS_PER_LBP).toFixed(0);
+    const entry     = { lbp:lbpEarned, frags:lbpEarned*FRAGS_PER_LBP, price:+price.toFixed(2), idr:idrVal, date:new Date().toLocaleDateString("id-ID"), time:new Date().toLocaleTimeString("id-ID",{hour:"2-digit",minute:"2-digit"}) };
+    const newHist   = [entry, ...history].slice(0,30);
+    setHistory(newHist);
+    setFragments(remain);
+    onEarn(remain, newHist, lbpEarned);
+  };
+
+  // Price chart sparkline (inline SVG)
+  const chartW = 280, chartH = 52;
+  const minP = Math.min(...priceHist, 1);
+  const maxP = Math.max(...priceHist, BASE_FRAG_PRICE+1);
+  const pts   = priceHist.map((p,i) => {
+    const x = priceHist.length===1 ? chartW/2 : (i/(priceHist.length-1))*chartW;
+    const y = chartH - ((p-minP)/(maxP-minP||1))*(chartH-6) - 3;
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(" ");
+  const priceColor = price >= (priceHist[priceHist.length-2]||price) ? "#4ade80" : "#ef4444";
+  const priceDiff  = priceHist.length>1 ? +(price-(priceHist[priceHist.length-2]||price)).toFixed(2) : 0;
+  const progressPct= Math.min(100, (fragments/FRAGS_PER_LBP)*100);
+  const rig        = MINING_RIGS[rigLevel];
+  const nextRig    = MINING_RIGS[rigLevel+1];
+
+  return (
+    <div style={{minHeight:"100vh",background:"#07070f",fontFamily:ff,color:"#e0e0e0",paddingBottom:90,maxWidth:480,margin:"0 auto",position:"relative",overflowX:"hidden"}}>
+
+      {/* Price alert toast */}
+      {lastNotif&&(
+        <div style={{position:"fixed",top:52,left:"50%",transform:"translateX(-50%)",background:lastNotif.up?"rgba(22,163,74,0.97)":"rgba(220,38,38,0.97)",color:"#fff",padding:"10px 22px",borderRadius:30,fontSize:13,fontWeight:700,zIndex:9999,whiteSpace:"nowrap",boxShadow:"0 6px 24px rgba(0,0,0,0.5)",backdropFilter:"blur(12px)"}}>
+          {lastNotif.msg}
+        </div>
+      )}
+
+      {/* Header */}
+      <div style={{background:"linear-gradient(160deg,#0d0620,#07070f)",padding:"48px 20px 16px"}}>
+        <div style={{fontSize:11,color:"#9333ea",fontWeight:700,letterSpacing:2,textTransform:"uppercase",marginBottom:4}}>⛏ LBP MINING</div>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+          <div>
+            <div style={{fontSize:22,fontWeight:800,color:"#e0e0e0"}}>Mining Station</div>
+            <div style={{fontSize:11,color:"#555",marginTop:2}}>Tap buat nambang fragment LBP</div>
+          </div>
+          <div style={{textAlign:"right"}}>
+            <div style={{fontSize:11,color:"#555",marginBottom:2}}>Tier saat ini</div>
+            <span style={{fontSize:12,fontWeight:700,padding:"3px 12px",borderRadius:20,background:`${tierInfo.color}20`,color:tierInfo.color,border:`1px solid ${tierInfo.color}40`}}>{tierInfo.label}</span>
+          </div>
+        </div>
+      </div>
+
+      <div style={{padding:"0 16px"}}>
+
+        {/* Price card + sparkline */}
+        <div style={{background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.07)",borderRadius:18,padding:"14px 16px 10px",marginBottom:12,overflow:"hidden",position:"relative"}}>
+          <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",marginBottom:10}}>
+            <div>
+              <div style={{fontSize:10,color:"#555",fontWeight:700,letterSpacing:1,textTransform:"uppercase",marginBottom:4}}>Harga LBP Fragment</div>
+              <div style={{fontSize:28,fontWeight:800,color:priceColor,lineHeight:1}}>Rp{price.toFixed(2)}<span style={{fontSize:12,color:"#555"}}>/frag</span></div>
+              <div style={{fontSize:11,marginTop:4,color:priceDiff>=0?"#4ade80":"#ef4444",fontWeight:600}}>{priceDiff>=0?"▲":"▼"} {Math.abs(priceDiff).toFixed(2)} ({((Math.abs(priceDiff)/(priceHist[priceHist.length-2]||price))*100).toFixed(1)}%)</div>
+            </div>
+            <div style={{textAlign:"right"}}>
+              <div style={{fontSize:10,color:"#555",marginBottom:4}}>1 LBP ≈</div>
+              <div style={{fontSize:16,fontWeight:800,color:"#ffd700"}}>Rp{(price*FRAGS_PER_LBP).toFixed(0)}</div>
+              <div style={{fontSize:10,color:"#555",marginTop:2}}>{FRAGS_PER_LBP} frags</div>
+            </div>
+          </div>
+          {/* Sparkline */}
+          <svg width={chartW} height={chartH} style={{display:"block",overflow:"visible"}}>
+            <defs>
+              <linearGradient id="chartGrad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor={priceColor} stopOpacity="0.25"/>
+                <stop offset="100%" stopColor={priceColor} stopOpacity="0"/>
+              </linearGradient>
+            </defs>
+            {priceHist.length>1&&(
+              <>
+                <polygon points={`0,${chartH} ${pts} ${chartW},${chartH}`} fill="url(#chartGrad)"/>
+                <polyline points={pts} fill="none" stroke={priceColor} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round"/>
+                {/* Last point dot */}
+                <circle cx={+(priceHist.length===1?chartW/2:chartW).toFixed(1)} cy={+(chartH-((price-minP)/(maxP-minP||1))*(chartH-6)-3).toFixed(1)} r="3.5" fill={priceColor}/>
+              </>
+            )}
+          </svg>
+          <div style={{display:"flex",justifyContent:"space-between",fontSize:9,color:"#333",marginTop:2}}>
+            <span>Rp{minP.toFixed(1)}</span><span style={{color:"#555"}}>Update setiap 8s</span><span>Rp{maxP.toFixed(1)}</span>
+          </div>
+        </div>
+
+        {/* Mining rig + yield info */}
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:12}}>
+          <div style={{background:"rgba(255,255,255,0.03)",border:`1px solid ${rig.color}30`,borderRadius:14,padding:"12px 14px"}}>
+            <div style={{fontSize:10,color:"#555",fontWeight:700,letterSpacing:1,marginBottom:6}}>MINING RIG</div>
+            <div style={{fontSize:20}}>{rig.icon}</div>
+            <div style={{fontSize:13,fontWeight:700,color:rig.color,marginTop:4}}>{rig.name}</div>
+            <div style={{fontSize:10,color:"#555",marginTop:2}}>Level {rig.level}</div>
+          </div>
+          <div style={{background:"rgba(255,215,0,0.04)",border:"1px solid rgba(255,215,0,0.2)",borderRadius:14,padding:"12px 14px"}}>
+            <div style={{fontSize:10,color:"#555",fontWeight:700,letterSpacing:1,marginBottom:6}}>PER TAP</div>
+            <div style={{fontSize:26,fontWeight:800,color:"#ffd700",lineHeight:1}}>{tapYield}</div>
+            <div style={{fontSize:10,color:"#555",marginTop:4}}>frags · ×{cardMult} card</div>
+            <div style={{fontSize:10,color:"#ffd700",marginTop:2}}>≈ Rp{(tapYield*price).toFixed(1)}</div>
+          </div>
+        </div>
+
+        {/* Fragment progress bar */}
+        <div style={{background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.07)",borderRadius:14,padding:"14px 16px",marginBottom:14}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+            <div style={{fontSize:12,fontWeight:700,color:"#e0e0e0"}}>Fragment Terkumpul</div>
+            <div style={{fontSize:13,fontWeight:800,color:"#ffd700"}}>{fragments.toFixed(1)} / {FRAGS_PER_LBP}</div>
+          </div>
+          <div style={{background:"rgba(255,255,255,0.06)",borderRadius:100,height:10,overflow:"hidden",marginBottom:8}}>
+            <div style={{height:"100%",width:`${progressPct}%`,background:`linear-gradient(90deg,#7c3aed,${progressPct>=100?"#4ade80":"#ffd700"})`,borderRadius:100,transition:"width 0.1s ease"}}/>
+          </div>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+            <div style={{fontSize:11,color:"#555"}}>{progressPct.toFixed(1)}% menuju 1 LBP</div>
+            {fragments>=FRAGS_PER_LBP&&(
+              <button onClick={claimManual} style={{background:"linear-gradient(135deg,#7c3aed,#9333ea)",border:"none",borderRadius:20,padding:"5px 14px",color:"#fff",fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:ff,boxShadow:"0 3px 12px rgba(147,51,234,0.4)"}}>
+                ✦ Claim LBP!
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* TAP BUTTON */}
+        <div ref={tapRef} style={{position:"relative",display:"flex",justifyContent:"center",marginBottom:16,userSelect:"none"}}>
+          {/* Floating popups */}
+          {popups.map(p=>(
+            <div key={p.id} style={{position:"absolute",left:p.x,top:p.y-20,fontSize:14,fontWeight:800,color:"#ffd700",pointerEvents:"none",animation:"floatUp 0.9s ease-out forwards",zIndex:10,whiteSpace:"nowrap",textShadow:"0 2px 8px rgba(0,0,0,0.8)"}}>
+              {p.val} frags
+            </div>
+          ))}
+          <button
+            onMouseDown={handleTap}
+            onTouchStart={handleTap}
+            style={{
+              width:170, height:170, borderRadius:"50%",
+              background: tapAnim
+                ? `radial-gradient(circle, ${tierInfo.color}55, #1a0533)`
+                : `radial-gradient(circle, ${tierInfo.color}30, #0d0620)`,
+              border:`3px solid ${tierInfo.color}${tapAnim?"ff":"60"}`,
+              cursor:"pointer", outline:"none",
+              display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",
+              transform: tapAnim ? "scale(0.93)" : "scale(1)",
+              transition:"transform 0.08s ease, border-color 0.08s, background 0.08s",
+              boxShadow: tapAnim
+                ? `0 0 40px ${tierInfo.color}60, 0 0 80px ${tierInfo.color}20`
+                : `0 0 20px ${tierInfo.color}25`,
+              fontFamily:ff,
+            }}
+          >
+            <div style={{fontSize:42,marginBottom:4,filter:"drop-shadow(0 0 8px currentColor)"}}>⛏</div>
+            <div style={{fontSize:13,fontWeight:800,color:tierInfo.color}}>TAP!</div>
+            <div style={{fontSize:10,color:"#555",marginTop:2}}>+{tapYield} frags</div>
+          </button>
+        </div>
+
+        {/* Upgrade rig section */}
+        <div style={{marginBottom:14}}>
+          <button onClick={()=>setShowRigs(r=>!r)} style={{width:"100%",background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:14,padding:"12px 16px",color:"#e0e0e0",fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:ff,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+            <span>⚙ Upgrade Mining Rig</span>
+            <span style={{fontSize:12,color:"#555"}}>{showRigs?"▲ Tutup":"▼ Buka"}</span>
+          </button>
+          {showRigs&&(
+            <div style={{marginTop:8}}>
+              {MINING_RIGS.slice(1).map(r=>{
+                const owned   = rigLevel >= r.level;
+                const isNext  = r.level === rigLevel+1;
+                const canBuy  = isNext && currentUser.lbp >= r.cost;
+                return (
+                  <div key={r.level} style={{background:owned?`${r.color}08`:"rgba(255,255,255,0.02)",border:`1px solid ${owned?r.color+"40":"rgba(255,255,255,0.06)"}`,borderRadius:12,padding:"12px 14px",marginBottom:8,display:"flex",alignItems:"center",gap:12}}>
+                    <div style={{fontSize:24,flexShrink:0}}>{r.icon}</div>
+                    <div style={{flex:1}}>
+                      <div style={{fontWeight:700,fontSize:13,color:owned?r.color:"#888"}}>{r.name}</div>
+                      <div style={{fontSize:11,color:"#555",marginTop:2}}>{r.desc}</div>
+                    </div>
+                    <div style={{textAlign:"right",flexShrink:0}}>
+                      {owned
+                        ?<span style={{fontSize:11,color:r.color,fontWeight:700,background:`${r.color}15`,border:`1px solid ${r.color}30`,borderRadius:20,padding:"3px 10px"}}>✓ Dimiliki</span>
+                        :<div>
+                          <div style={{fontSize:12,fontWeight:700,color:"#ffd700",marginBottom:4,textAlign:"right"}}>{r.cost} LBP</div>
+                          <button onClick={()=>onBuyRig(r)} disabled={!canBuy} style={{background:canBuy?"linear-gradient(135deg,#7c3aed,#9333ea)":"rgba(255,255,255,0.05)",border:"none",borderRadius:10,padding:"5px 14px",color:canBuy?"#fff":"#444",fontSize:11,fontWeight:700,cursor:canBuy?"pointer":"not-allowed",fontFamily:ff,opacity:canBuy?1:0.6}}>
+                            {canBuy?"Beli":isNext?`Kurang ${r.cost-currentUser.lbp} LBP`:"Unlock dulu"}
+                          </button>
+                        </div>
+                      }
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Mining history */}
+        {history.length>0&&(
+          <div style={{marginBottom:16}}>
+            <div style={{fontSize:11,fontWeight:700,color:"#9333ea",letterSpacing:2,textTransform:"uppercase",marginBottom:10}}>Riwayat Mining</div>
+            <div style={{background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.07)",borderRadius:14,overflow:"hidden"}}>
+              {history.slice(0,8).map((h,i)=>(
+                <div key={i} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 14px",borderBottom:i<Math.min(history.length,8)-1?"1px solid rgba(255,255,255,0.04)":"none"}}>
+                  <div>
+                    <div style={{fontSize:12,fontWeight:700,color:"#e0e0e0"}}>+{h.lbp} LBP</div>
+                    <div style={{fontSize:10,color:"#555"}}>{h.date} · {h.time}</div>
+                  </div>
+                  <div style={{textAlign:"right"}}>
+                    <div style={{fontSize:12,color:"#4ade80",fontWeight:600}}>≈ Rp{h.idr}</div>
+                    <div style={{fontSize:10,color:"#555"}}>@ Rp{h.price}/frag</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Tier rate table */}
+        <div style={{background:"rgba(255,255,255,0.02)",border:"1px solid rgba(255,255,255,0.06)",borderRadius:14,padding:"14px",marginBottom:16}}>
+          <div style={{fontSize:11,fontWeight:700,color:"#555",letterSpacing:1,textTransform:"uppercase",marginBottom:10}}>Rate per Tier (base tap)</div>
+          {Object.entries(MINING_RATES).map(([key,r])=>{
+            const active = tier===key;
+            return (
+              <div key={key} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"7px 0",borderBottom:"1px solid rgba(255,255,255,0.04)"}}>
+                <div style={{display:"flex",alignItems:"center",gap:8}}>
+                  {active&&<div style={{width:6,height:6,borderRadius:"50%",background:r.color,flexShrink:0}}/>}
+                  {!active&&<div style={{width:6,height:6,flexShrink:0}}/>}
+                  <span style={{fontSize:12,fontWeight:active?700:400,color:active?r.color:"#555"}}>{r.label}</span>
+                </div>
+                <span style={{fontSize:12,fontWeight:700,color:active?r.color:"#444"}}>{r.base} frags/tap</span>
+              </div>
+            );
+          })}
+        </div>
+
+      </div>
+
+      {/* CSS for float-up animation */}
+      <style>{`@keyframes floatUp{0%{opacity:1;transform:translateY(0) scale(1)}100%{opacity:0;transform:translateY(-55px) scale(1.3)}}`}</style>
+    </div>
+  );
+};
+
 const pageStyle = {minHeight:"100vh",background:"#07070f",fontFamily:ff,color:"#e0e0e0",paddingBottom:76,maxWidth:480,margin:"0 auto",position:"relative"};
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -697,6 +1097,7 @@ function App() {
       id:Date.now().toString(), username:rUser, password:rPass, role:"user",
       lbp:settings.newUserBonus, sales:0, stock:100, wallet:0, soldToday:0,
       joinDate:new Date().toISOString().split("T")[0], memberCard:null, ownedCards:[],
+      miningFrags:0, miningRig:0, miningHistory:[],
       setoran:0, withdrawn:0, stockRequests:[],
       lbpHistory:[{type:"earn",amount:settings.newUserBonus,desc:"Bonus signup",date:new Date().toLocaleDateString("id-ID")}],
       salesHistory:[], referralCode:code, referredBy:referrerId, referrals:[], monthlySales:0, avatar:null
@@ -1312,6 +1713,7 @@ function App() {
     const userNav = [
       {id:"home",    icon:"🏠", label:"Home"},
       {id:"shop",    icon:"🛍️",label:"Shop"},
+      {id:"mining",  icon:"⛏", label:"Mining"},
       {id:"ranking", icon:"🏆", label:"Ranking"},
       {id:"profil",  icon:"👤", label:"Profil"},
     ];
@@ -1712,6 +2114,36 @@ function App() {
         </>}
 
         {/* RANKING */}
+        {activeNav==="mining"&&(
+          <MiningPanel
+            currentUser={currentUser}
+            onEarn={(frags, hist, lbpEarned) => {
+              updateUser(currentUser.id, {
+                miningFrags: frags,
+                miningHistory: hist,
+                ...(lbpEarned ? {
+                  lbp: currentUser.lbp + lbpEarned,
+                  lbpHistory: [
+                    {type:"earn", amount:lbpEarned, desc:`Mining ${lbpEarned} LBP`, date:new Date().toLocaleDateString("id-ID")},
+                    ...(currentUser.lbpHistory||[])
+                  ].slice(0,50)
+                } : {})
+              });
+            }}
+            onBuyRig={(rig) => {
+              if (currentUser.lbp < rig.cost) return;
+              updateUser(currentUser.id, {
+                lbp: currentUser.lbp - rig.cost,
+                miningRig: rig.level,
+                lbpHistory: [
+                  {type:"spend", amount:rig.cost, desc:`Beli ${rig.name}`, date:new Date().toLocaleDateString("id-ID")},
+                  ...(currentUser.lbpHistory||[])
+                ].slice(0,50)
+              });
+              showToast("s", `${rig.icon} ${rig.name} dibeli! Mining makin kenceng 🔥`);
+            }}
+          />
+        )}
         {activeNav==="ranking"&&<>
           <div style={{background:"linear-gradient(160deg,#1a0533,#07070f)",padding:"48px 20px 20px",marginBottom:4}}>
             <div style={{fontSize:11,color:"#9333ea",fontWeight:700,letterSpacing:2,textTransform:"uppercase"}}>◈ Papan Skor</div>
