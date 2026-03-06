@@ -100,7 +100,7 @@ const DB = {
       lbp:9999, sales:0,  stock:0,   wallet:0, soldToday:0,
       joinDate:"2024-01-01", memberCard:null, ownedCards:[], setoran:0, withdrawn:0,
       stockRequests:[], lbpHistory:[], salesHistory:[], referralCode:"ADMIN00",
-      referredBy:null, referrals:[], monthlySales:0 },
+      referredBy:null, referrals:[], monthlySales:0, avatar:null },
     { id:"gopal", username:"Gopal",     password:"010101", role:"user",
       lbp:2500, sales:87, stock:120, wallet:1609500, soldToday:5,
       joinDate:"2025-06-15", memberCard:null, ownedCards:[], setoran:1870500, withdrawn:0,
@@ -111,8 +111,9 @@ const DB = {
         {qty:5,profit:92500,lbp:25,date:"2026-03-06"},
         {qty:12,profit:222000,lbp:60,date:"2026-03-05"},
       ], referralCode:"GOPAL87",
-      referredBy:null, referrals:[], monthlySales:17 },
+      referredBy:null, referrals:[], monthlySales:17, avatar:null },
   ],
+  chat: {},
   settings: { newUserBonus:20 },
 };
 
@@ -373,6 +374,258 @@ const ReferralPanel = ({user,myCard,users,onBack,showToast}) => {
   );
 };
 
+
+// ─── AVATAR COMPONENT ──────────────────────────────────────────────────────────
+const Avatar = ({user, size=42, onClick, showBadge=false, badgeCount=0}) => {
+  const rank = getRank(user.lbp);
+  return (
+    <div onClick={onClick} style={{position:"relative",flexShrink:0,cursor:onClick?"pointer":undefined}}>
+      {user.avatar
+        ? <img src={user.avatar} style={{width:size,height:size,borderRadius:"50%",objectFit:"cover",border:`2px solid ${rank.color}55`,display:"block"}}/>
+        : <div style={{width:size,height:size,borderRadius:"50%",background:`linear-gradient(135deg,${rank.color},#1a0533)`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:size*0.38,fontWeight:800,border:`2px solid ${rank.color}55`,color:"#fff"}}>
+            {user.username[0].toUpperCase()}
+          </div>
+      }
+      {showBadge&&badgeCount>0&&(
+        <div style={{position:"absolute",top:-3,right:-3,background:"#ef4444",borderRadius:"50%",width:16,height:16,display:"flex",alignItems:"center",justifyContent:"center",fontSize:9,fontWeight:800,color:"#fff",border:"2px solid #07070f"}}>
+          {badgeCount>9?"9+":badgeCount}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ─── AVATAR UPLOAD PANEL ───────────────────────────────────────────────────────
+const AvatarUpload = ({user, onSave, onBack}) => {
+  const [preview, setPreview] = useState(user.avatar||null);
+  const rank = getRank(user.lbp);
+
+  const handleFile = (e) => {
+    const file = e.target.files[0];
+    if(!file) return;
+    if(!file.type.startsWith("image/")) { alert("File harus berupa gambar!"); return; }
+    if(file.size > 2*1024*1024) { alert("Ukuran file maksimal 2MB!"); return; }
+    const reader = new FileReader();
+    reader.onload = (ev) => setPreview(ev.target.result);
+    reader.readAsDataURL(file);
+  };
+
+  return (
+    <div style={{minHeight:"100vh",background:"#07070f",fontFamily:ff,color:"#e0e0e0",paddingBottom:32,maxWidth:480,margin:"0 auto"}}>
+      <BackHeader title="Edit Foto Profil" sub="Profil" accent="#9333ea" onBack={onBack}/>
+      <div style={{padding:"24px 16px"}}>
+        {/* Preview */}
+        <div style={{display:"flex",flexDirection:"column",alignItems:"center",marginBottom:32}}>
+          <div style={{position:"relative",marginBottom:16}}>
+            {preview
+              ? <img src={preview} style={{width:120,height:120,borderRadius:"50%",objectFit:"cover",border:`3px solid ${rank.color}`,display:"block"}}/>
+              : <div style={{width:120,height:120,borderRadius:"50%",background:`linear-gradient(135deg,${rank.color},#1a0533)`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:48,fontWeight:800,border:`3px solid ${rank.color}55`,color:"#fff"}}>
+                  {user.username[0].toUpperCase()}
+                </div>
+            }
+            <label htmlFor="avatarInput" style={{position:"absolute",bottom:4,right:4,background:"#9333ea",borderRadius:"50%",width:32,height:32,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",fontSize:14,boxShadow:"0 2px 8px rgba(0,0,0,0.5)"}}>
+              📷
+            </label>
+          </div>
+          <div style={{fontSize:18,fontWeight:800,color:"#e0e0e0"}}>{user.username}</div>
+          <Badge c={rank.color}>{rank.label}</Badge>
+        </div>
+
+        <input id="avatarInput" type="file" accept="image/*" onChange={handleFile} style={{display:"none"}}/>
+
+        <Card style={{marginBottom:16,textAlign:"center"}}>
+          <div style={{fontSize:13,color:"#666",marginBottom:16}}>Tap ikon 📷 di foto atau tombol di bawah untuk pilih gambar</div>
+          <label htmlFor="avatarInput">
+            <div style={{background:"rgba(147,51,234,0.1)",border:"1px solid rgba(147,51,234,0.3)",borderRadius:14,padding:"14px",fontSize:15,fontWeight:700,color:"#c084fc",cursor:"pointer",marginBottom:preview&&preview!==user.avatar?12:0}}>
+              📷 Pilih Foto dari Galeri
+            </div>
+          </label>
+          {preview && preview !== user.avatar && (
+            <Btn onClick={()=>onSave(preview)} style={{marginTop:8}}>✓ Simpan Foto Profil</Btn>
+          )}
+          {preview && (
+            <div style={{marginTop:10}}>
+              <Btn variant="danger" small onClick={()=>{ setPreview(null); onSave(null); }}>🗑 Hapus Foto</Btn>
+            </div>
+          )}
+        </Card>
+        <div style={{fontSize:11,color:"#444",textAlign:"center"}}>Foto maksimal 2MB · JPG, PNG, atau GIF</div>
+      </div>
+    </div>
+  );
+};
+
+// ─── CHAT PANEL (USER SIDE) ────────────────────────────────────────────────────
+const ChatPanel = ({user, chat, setChat, onBack}) => {
+  const [msg, setMsg] = useState("");
+  const msgs = chat[user.id] || [];
+  const bottomRef = React.useRef(null);
+
+  const now = () => new Date().toLocaleTimeString("id-ID",{hour:"2-digit",minute:"2-digit"});
+  const today = () => new Date().toLocaleDateString("id-ID");
+
+  useEffect(()=>{
+    // Mark admin messages as read when user opens chat
+    const updated = {...chat};
+    if(updated[user.id]) {
+      updated[user.id] = updated[user.id].map(m=>m.from==="admin"?{...m,read:true}:m);
+      setChat(updated); DB.chat=updated;
+    }
+  },[]);
+
+  useEffect(()=>{
+    bottomRef.current?.scrollIntoView({behavior:"smooth"});
+  },[msgs.length]);
+
+  const send = () => {
+    if(!msg.trim()) return;
+    const newMsg = {id:Date.now().toString(), from:"user", text:msg.trim(), time:now(), date:today(), read:false};
+    const updated = {...chat, [user.id]: [...(chat[user.id]||[]), newMsg]};
+    setChat(updated); DB.chat=updated;
+    setMsg("");
+  };
+
+  return (
+    <div style={{minHeight:"100vh",background:"#07070f",fontFamily:ff,color:"#e0e0e0",maxWidth:480,margin:"0 auto",display:"flex",flexDirection:"column"}}>
+      {/* Header */}
+      <div style={{background:"linear-gradient(160deg,#1a0533,#07070f)",padding:"48px 20px 16px",flexShrink:0}}>
+        <button onClick={onBack} style={{background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:10,padding:"8px 16px",color:"#bbb",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:ff,marginBottom:14}}>← Kembali</button>
+        <div style={{display:"flex",alignItems:"center",gap:12}}>
+          <div style={{width:42,height:42,borderRadius:"50%",background:"linear-gradient(135deg,#9333ea,#1a0533)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,fontWeight:800,border:"2px solid rgba(147,51,234,0.5)"}}>N</div>
+          <div>
+            <div style={{fontSize:16,fontWeight:800}}>Northgate Admin</div>
+            <div style={{fontSize:11,color:"#4ade80",fontWeight:600}}>● Online</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Messages */}
+      <div style={{flex:1,overflowY:"auto",padding:"16px",paddingBottom:80}}>
+        {msgs.length===0&&(
+          <div style={{textAlign:"center",padding:"40px 20px",color:"#444"}}>
+            <div style={{fontSize:32,marginBottom:8}}>💬</div>
+            <div style={{fontSize:14,fontWeight:600,marginBottom:4}}>Belum ada pesan</div>
+            <div style={{fontSize:12}}>Kirim pesan ke admin Northgate di sini</div>
+          </div>
+        )}
+        {msgs.map((m,i)=>{
+          const isUser = m.from==="user";
+          const showDate = i===0 || msgs[i-1].date!==m.date;
+          return (
+            <div key={m.id}>
+              {showDate&&<div style={{textAlign:"center",fontSize:11,color:"#444",margin:"12px 0",fontWeight:600}}>{m.date}</div>}
+              <div style={{display:"flex",justifyContent:isUser?"flex-end":"flex-start",marginBottom:8}}>
+                <div style={{maxWidth:"78%"}}>
+                  <div style={{background:isUser?"linear-gradient(135deg,#7c3aed,#9333ea)":"rgba(255,255,255,0.07)",borderRadius:isUser?"18px 18px 4px 18px":"18px 18px 18px 4px",padding:"10px 14px",fontSize:14,color:"#e0e0e0",lineHeight:1.5}}>
+                    {m.text}
+                  </div>
+                  <div style={{fontSize:10,color:"#444",marginTop:3,textAlign:isUser?"right":"left"}}>
+                    {m.time} {isUser&&(m.read?"✓✓":"✓")}
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+        <div ref={bottomRef}/>
+      </div>
+
+      {/* Input */}
+      <div style={{position:"fixed",bottom:0,left:0,right:0,maxWidth:480,margin:"0 auto",padding:"12px 16px",background:"rgba(8,6,18,0.97)",borderTop:"1px solid rgba(255,255,255,0.07)",backdropFilter:"blur(20px)",display:"flex",gap:10,alignItems:"center",paddingBottom:"calc(12px + env(safe-area-inset-bottom,0px))"}}>
+        <input value={msg} onChange={e=>setMsg(e.target.value)} onKeyDown={e=>e.key==="Enter"&&send()}
+          placeholder="Ketik pesan..." style={{flex:1,background:"rgba(255,255,255,0.07)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:20,padding:"11px 16px",color:"#e0e0e0",fontSize:15,outline:"none",fontFamily:ff}}/>
+        <button onClick={send} style={{width:44,height:44,borderRadius:"50%",background:msg.trim()?"linear-gradient(135deg,#7c3aed,#9333ea)":"rgba(255,255,255,0.06)",border:"none",cursor:msg.trim()?"pointer":"default",fontSize:18,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,transition:"background 0.2s"}}>
+          ➤
+        </button>
+      </div>
+    </div>
+  );
+};
+
+// ─── CHAT PANEL (ADMIN SIDE) ───────────────────────────────────────────────────
+const AdminChatPanel = ({adminUser, targetUser, chat, setChat, onBack}) => {
+  const [msg, setMsg] = useState("");
+  const msgs = chat[targetUser.id] || [];
+  const bottomRef = React.useRef(null);
+  const rank = getRank(targetUser.lbp);
+
+  const now = () => new Date().toLocaleTimeString("id-ID",{hour:"2-digit",minute:"2-digit"});
+  const today = () => new Date().toLocaleDateString("id-ID");
+
+  useEffect(()=>{
+    // Mark user messages as read
+    const updated = {...chat};
+    if(updated[targetUser.id]) {
+      updated[targetUser.id] = updated[targetUser.id].map(m=>m.from==="user"?{...m,read:true}:m);
+      setChat(updated); DB.chat=updated;
+    }
+  },[targetUser.id]);
+
+  useEffect(()=>{
+    bottomRef.current?.scrollIntoView({behavior:"smooth"});
+  },[msgs.length]);
+
+  const send = () => {
+    if(!msg.trim()) return;
+    const newMsg = {id:Date.now().toString(), from:"admin", text:msg.trim(), time:now(), date:today(), read:false};
+    const updated = {...chat, [targetUser.id]: [...(chat[targetUser.id]||[]), newMsg]};
+    setChat(updated); DB.chat=updated;
+    setMsg("");
+  };
+
+  return (
+    <div style={{minHeight:"100vh",background:"#07070f",fontFamily:ff,color:"#e0e0e0",maxWidth:480,margin:"0 auto",display:"flex",flexDirection:"column"}}>
+      <div style={{background:`linear-gradient(160deg,${rank.color}22,#07070f)`,padding:"48px 20px 16px",flexShrink:0}}>
+        <button onClick={onBack} style={{background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:10,padding:"8px 16px",color:"#bbb",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:ff,marginBottom:14}}>← Kembali</button>
+        <div style={{display:"flex",alignItems:"center",gap:12}}>
+          <Avatar user={targetUser} size={42}/>
+          <div>
+            <div style={{fontSize:16,fontWeight:800}}>{targetUser.username}</div>
+            <Badge c={rank.color} sm>{rank.label}</Badge>
+          </div>
+        </div>
+      </div>
+
+      <div style={{flex:1,overflowY:"auto",padding:"16px",paddingBottom:80}}>
+        {msgs.length===0&&(
+          <div style={{textAlign:"center",padding:"40px 20px",color:"#444"}}>
+            <div style={{fontSize:32,marginBottom:8}}>💬</div>
+            <div style={{fontSize:14,fontWeight:600,marginBottom:4}}>Belum ada pesan dari {targetUser.username}</div>
+          </div>
+        )}
+        {msgs.map((m,i)=>{
+          const isAdmin = m.from==="admin";
+          const showDate = i===0 || msgs[i-1].date!==m.date;
+          return (
+            <div key={m.id}>
+              {showDate&&<div style={{textAlign:"center",fontSize:11,color:"#444",margin:"12px 0",fontWeight:600}}>{m.date}</div>}
+              <div style={{display:"flex",justifyContent:isAdmin?"flex-end":"flex-start",marginBottom:8}}>
+                <div style={{maxWidth:"78%"}}>
+                  <div style={{background:isAdmin?"linear-gradient(135deg,#7c3aed,#9333ea)":"rgba(255,255,255,0.07)",borderRadius:isAdmin?"18px 18px 4px 18px":"18px 18px 18px 4px",padding:"10px 14px",fontSize:14,color:"#e0e0e0",lineHeight:1.5}}>
+                    {m.text}
+                  </div>
+                  <div style={{fontSize:10,color:"#444",marginTop:3,textAlign:isAdmin?"right":"left"}}>
+                    {m.time} {isAdmin&&(m.read?"✓✓":"✓")}
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+        <div ref={bottomRef}/>
+      </div>
+
+      <div style={{position:"fixed",bottom:0,left:0,right:0,maxWidth:480,margin:"0 auto",padding:"12px 16px",background:"rgba(8,6,18,0.97)",borderTop:"1px solid rgba(255,255,255,0.07)",backdropFilter:"blur(20px)",display:"flex",gap:10,alignItems:"center",paddingBottom:"calc(12px + env(safe-area-inset-bottom,0px))"}}>
+        <input value={msg} onChange={e=>setMsg(e.target.value)} onKeyDown={e=>e.key==="Enter"&&send()}
+          placeholder={`Balas ${targetUser.username}...`} style={{flex:1,background:"rgba(255,255,255,0.07)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:20,padding:"11px 16px",color:"#e0e0e0",fontSize:15,outline:"none",fontFamily:ff}}/>
+        <button onClick={send} style={{width:44,height:44,borderRadius:"50%",background:msg.trim()?"linear-gradient(135deg,#7c3aed,#9333ea)":"rgba(255,255,255,0.06)",border:"none",cursor:msg.trim()?"pointer":"default",fontSize:18,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+          ➤
+        </button>
+      </div>
+    </div>
+  );
+};
+
 const pageStyle = {minHeight:"100vh",background:"#07070f",fontFamily:ff,color:"#e0e0e0",paddingBottom:76,maxWidth:480,margin:"0 auto",position:"relative"};
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -389,6 +642,8 @@ function App() {
   const [shopDetail, setShopDetail] = useState(null);
   const [toast,      setToast]      = useState(null);
   const [tick,       setTick]       = useState(0); // for countdown refresh
+  const [chat,       setChat]       = useState(DB.chat);
+  const [adminChatTarget, setAdminChatTarget] = useState(null); // userId admin is chatting with
 
   // Auth fields
   const [lUser,setLUser]=useState(""); const [lPass,setLPass]=useState(""); const [lErr,setLErr]=useState("");
@@ -444,7 +699,7 @@ function App() {
       joinDate:new Date().toISOString().split("T")[0], memberCard:null, ownedCards:[],
       setoran:0, withdrawn:0, stockRequests:[],
       lbpHistory:[{type:"earn",amount:settings.newUserBonus,desc:"Bonus signup",date:new Date().toLocaleDateString("id-ID")}],
-      salesHistory:[], referralCode:code, referredBy:referrerId, referrals:[], monthlySales:0
+      salesHistory:[], referralCode:code, referredBy:referrerId, referrals:[], monthlySales:0, avatar:null
     };
     
     let updatedUsers = [...users, nu];
@@ -595,10 +850,20 @@ function App() {
       {id:"home",    icon:"📊", label:"Overview"},
       {id:"users",   icon:"👥", label:"Users"},
       {id:"finance", icon:"💰", label:"Keuangan"},
+      {id:"inbox",   icon:"💬", label:"Inbox"},
       {id:"setting", icon:"⚙️", label:"Setting"},
     ];
+    // count unread messages from users
+    const totalUnread = Object.entries(chat).reduce((sum,[uid,msgs])=>sum+(msgs||[]).filter(m=>m.from==="user"&&!m.read).length,0);
 
     // ── Admin sub-panel ─────────────────────────────────────────────────────
+    // Admin chat with specific user
+    if(adminChatTarget) {
+      const tu = users.find(u=>u.id===adminChatTarget);
+      if(!tu){setAdminChatTarget(null); return null;}
+      return <AdminChatPanel adminUser={currentUser} targetUser={tu} chat={chat} setChat={setChat} onBack={()=>setAdminChatTarget(null)}/>;
+    }
+
     if(adminSub) {
       const {panel,userId} = adminSub;
       const u = users.find(x=>x.id===userId);
@@ -834,7 +1099,7 @@ function App() {
             {sorted.map(u=>{const r=getRank(u.lbp); return (
               <Card key={u.id} style={{marginBottom:10}}>
                 <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:12}}>
-                  <div style={{width:42,height:42,borderRadius:"50%",background:`linear-gradient(135deg,${r.color},#07070f)`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:17,fontWeight:800,border:`2px solid ${r.color}40`,flexShrink:0}}>{u.username[0]}</div>
+                  <Avatar user={u} size={42}/>
                   <div style={{flex:1}}>
                     <div style={{fontWeight:700,fontSize:15}}>{u.username}</div>
                     <Badge c={r.color} sm>{r.label}</Badge>
@@ -875,7 +1140,7 @@ function App() {
             {sorted.map(u=>{const r=getRank(u.lbp); const card=MEMBER_CARDS.find(c=>c.id===u.memberCard); return (
               <Card key={u.id} style={{marginBottom:12}}>
                 <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:14}}>
-                  <div style={{width:46,height:46,borderRadius:"50%",background:`linear-gradient(135deg,${r.color},#07070f)`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,fontWeight:800,border:`2px solid ${r.color}40`,flexShrink:0}}>{u.username[0]}</div>
+                  <Avatar user={u} size={46}/>
                   <div style={{flex:1}}>
                     <div style={{fontWeight:700,fontSize:16}}>{u.username}</div>
                     <div style={{fontSize:11,color:"#555",marginTop:2}}>Bergabung {u.joinDate}</div>
@@ -1000,6 +1265,37 @@ function App() {
             </Card>
           </>}
         </div>
+          {/* ── INBOX ── */}
+          {activeNav==="inbox"&&<>
+            <div style={{height:16}}/>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14}}>
+              <SecTitle style={{marginBottom:0}}>Pesan dari User</SecTitle>
+              {totalUnread>0&&<span style={{background:"#ef4444",color:"#fff",borderRadius:20,padding:"3px 10px",fontSize:11,fontWeight:800}}>{totalUnread} baru</span>}
+            </div>
+            {nonAdmin.length===0&&<Card><div style={{textAlign:"center",color:"#444",fontSize:13,padding:"16px 0"}}>Belum ada user</div></Card>}
+            {nonAdmin.map(u=>{
+              const r=getRank(u.lbp);
+              const msgs=chat[u.id]||[];
+              const unread=msgs.filter(m=>m.from==="user"&&!m.read).length;
+              const lastMsg=msgs[msgs.length-1];
+              return (
+                <Card key={u.id} onClick={()=>setAdminChatTarget(u.id)} style={{marginBottom:10,display:"flex",alignItems:"center",gap:12,cursor:"pointer",border:unread>0?"1px solid rgba(147,51,234,0.4)":"1px solid rgba(255,255,255,0.08)",background:unread>0?"rgba(147,51,234,0.06)":"rgba(255,255,255,0.03)"}}>
+                  <Avatar user={u} size={46} showBadge={true} badgeCount={unread}/>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontWeight:700,fontSize:15,color:unread>0?"#e0e0e0":"#aaa"}}>{u.username}</div>
+                    <div style={{fontSize:12,color:"#555",marginTop:2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                      {lastMsg ? (lastMsg.from==="admin"?"Kamu: ":"")+lastMsg.text : "Belum ada pesan"}
+                    </div>
+                  </div>
+                  <div style={{textAlign:"right",flexShrink:0}}>
+                    {lastMsg&&<div style={{fontSize:10,color:"#444"}}>{lastMsg.time}</div>}
+                    <div style={{fontSize:18,color:"#444",marginTop:4}}>›</div>
+                  </div>
+                </Card>
+              );
+            })}
+          </>}
+
         <BottomNav items={adminNav} active={activeNav} onNav={setActiveNav}/>
       </div>
     );
@@ -1017,7 +1313,9 @@ function App() {
       {id:"home",    icon:"🏠", label:"Home"},
       {id:"shop",    icon:"🛍️",label:"Shop"},
       {id:"ranking", icon:"🏆", label:"Ranking"},
+      {id:"profil",  icon:"👤", label:"Profil"},
     ];
+    const unreadFromAdmin = (chat[currentUser.id]||[]).filter(m=>m.from==="admin"&&!m.read).length;
 
     // ── Referral panel ─────────────────────────────────────────────────────
     if(subPanel==="referral") return (
@@ -1027,6 +1325,16 @@ function App() {
     // ── LBP History panel ──────────────────────────────────────────────────
     if(subPanel==="lbpHistory") return (
       <LBPHistoryPanel history={currentUser.lbpHistory} onBack={()=>setSubPanel(null)}/>
+    );
+
+    // ── Chat panel ────────────────────────────────────────────────────────
+    if(subPanel==="chat") return (
+      <ChatPanel user={currentUser} chat={chat} setChat={setChat} onBack={()=>setSubPanel(null)}/>
+    );
+
+    // ── Avatar upload ──────────────────────────────────────────────────────
+    if(subPanel==="avatar") return (
+      <AvatarUpload user={currentUser} onSave={(av)=>{ updateUser(currentUser.id,{avatar:av}); showToast("s",av?"Foto profil diperbarui!":"Foto profil dihapus."); setSubPanel(null); }} onBack={()=>setSubPanel(null)}/>
     );
 
     // ── Shop Detail ─────────────────────────────────────────────────────────
@@ -1261,10 +1569,7 @@ function App() {
                 <div style={{fontSize:12,color:"#9333ea",fontWeight:700,letterSpacing:1}}>◈ NORTHGATE SALES</div>
                 <div style={{fontSize:22,fontWeight:800,color:"#e0e0e0",marginTop:2}}>Halo, {currentUser.username}! 👋</div>
               </div>
-              <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:6}}>
-                <div style={{width:46,height:46,borderRadius:"50%",background:`linear-gradient(135deg,${rank.color},#1a0533)`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,fontWeight:800,border:`2px solid ${rank.color}55`}}>{currentUser.username[0]}</div>
-                <button onClick={logout} style={{background:"rgba(239,68,68,0.12)",border:"1px solid rgba(239,68,68,0.25)",borderRadius:8,padding:"5px 10px",color:"#ef4444",fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:ff}}>Logout</button>
-              </div>
+              <Avatar user={currentUser} size={46} showBadge={true} badgeCount={unreadFromAdmin} onClick={()=>{setActiveNav("profil");setSubPanel(null);}}/>
             </div>
             <div style={{background:"rgba(255,255,255,0.04)",border:`1px solid ${rank.color}30`,borderRadius:18,padding:"16px 20px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
               <div>
@@ -1420,7 +1725,7 @@ function App() {
               return (
                 <Card key={u.id} style={{marginBottom:10,display:"flex",alignItems:"center",gap:14,border:isMe?`1px solid ${r.color}45`:"1px solid rgba(255,255,255,0.07)",background:isMe?`linear-gradient(135deg,${r.color}10,#07070f)`:"rgba(255,255,255,0.03)",boxShadow:isMe?`0 0 20px ${r.color}12`:"none"}}>
                   <div style={{fontSize:24,minWidth:34,textAlign:"center"}}>{medals[i]||<span style={{fontSize:14,color:"#555",fontWeight:700}}>#{i+1}</span>}</div>
-                  <div style={{width:42,height:42,borderRadius:"50%",background:`linear-gradient(135deg,${r.color},#07070f)`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:17,fontWeight:800,border:`2px solid ${r.color}40`,flexShrink:0}}>{u.username[0]}</div>
+                  <Avatar user={u} size={42}/>
                   <div style={{flex:1,minWidth:0}}>
                     <div style={{fontWeight:700,fontSize:15,color:isMe?r.color:"#e0e0e0"}}>{u.username}{isMe&&<span style={{fontSize:11,color:"#555"}}> (kamu)</span>}</div>
                     <div style={{display:"flex",alignItems:"center",gap:6,marginTop:3,flexWrap:"wrap"}}>
@@ -1435,6 +1740,77 @@ function App() {
                 </Card>
               );
             })}
+          </div>
+        </>}
+
+        {/* PROFIL */}
+        {activeNav==="profil"&&<>
+          <div style={{background:"linear-gradient(160deg,#1a0533,#07070f)",padding:"48px 20px 28px"}}>
+            <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:12}}>
+              <div style={{position:"relative"}}>
+                <Avatar user={currentUser} size={90}/>
+                <button onClick={()=>setSubPanel("avatar")} style={{position:"absolute",bottom:2,right:2,background:"#9333ea",border:"none",borderRadius:"50%",width:28,height:28,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",fontSize:13,boxShadow:"0 2px 8px rgba(0,0,0,0.5)"}}>📷</button>
+              </div>
+              <div style={{textAlign:"center"}}>
+                <div style={{fontSize:22,fontWeight:800,color:"#e0e0e0"}}>{currentUser.username}</div>
+                <div style={{marginTop:4}}><Badge c={rank.color}>{rank.label}</Badge></div>
+                <div style={{fontSize:12,color:"#555",marginTop:6}}>Bergabung {currentUser.joinDate}</div>
+              </div>
+            </div>
+          </div>
+          <div style={{padding:"16px 16px"}}>
+            {/* Stats */}
+            <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10,marginBottom:16}}>
+              {[{l:"Sales",v:currentUser.sales,c:"#4ade80"},{l:"LBP",v:currentUser.lbp,c:"#ffd700",coin:true},{l:"Referral",v:(currentUser.referrals||[]).length,c:"#60efff"}].map(x=>(
+                <Card key={x.l} style={{textAlign:"center",padding:"14px 8px"}}>
+                  <div style={{fontSize:10,color:"#555",marginBottom:4,display:"flex",alignItems:"center",justifyContent:"center",gap:3}}>{x.coin&&<LBPCoin size={10}/>}{x.l}</div>
+                  <div style={{fontSize:20,fontWeight:800,color:x.c}}>{x.v}</div>
+                </Card>
+              ))}
+            </div>
+
+            {/* Chat with admin */}
+            <SecTitle>💬 Chat & Pesan</SecTitle>
+            <Card onClick={()=>setSubPanel("chat")} style={{marginBottom:16,cursor:"pointer",border:unreadFromAdmin>0?"1px solid rgba(147,51,234,0.4)":"1px solid rgba(255,255,255,0.08)",background:unreadFromAdmin>0?"rgba(147,51,234,0.06)":"rgba(255,255,255,0.03)"}}>
+              <div style={{display:"flex",alignItems:"center",gap:12}}>
+                <div style={{width:46,height:46,borderRadius:"50%",background:"linear-gradient(135deg,#9333ea,#1a0533)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,fontWeight:800,border:"2px solid rgba(147,51,234,0.5)",position:"relative"}}>
+                  N
+                  {unreadFromAdmin>0&&<div style={{position:"absolute",top:-3,right:-3,background:"#ef4444",borderRadius:"50%",width:16,height:16,display:"flex",alignItems:"center",justifyContent:"center",fontSize:9,fontWeight:800,color:"#fff",border:"2px solid #07070f"}}>{unreadFromAdmin}</div>}
+                </div>
+                <div style={{flex:1}}>
+                  <div style={{fontWeight:700,fontSize:15}}>Northgate Admin</div>
+                  <div style={{fontSize:12,color:"#555",marginTop:2}}>
+                    {(()=>{const msgs=chat[currentUser.id]||[]; const last=msgs[msgs.length-1]; return last?(last.from==="admin"?"Admin: ":"Kamu: ")+last.text:"Tap untuk mulai chat";})()}
+                  </div>
+                </div>
+                {unreadFromAdmin>0&&<span style={{background:"#ef4444",color:"#fff",borderRadius:20,padding:"3px 8px",fontSize:11,fontWeight:800}}>{unreadFromAdmin}</span>}
+                <span style={{color:"#555",fontSize:18}}>›</span>
+              </div>
+            </Card>
+
+            {/* Foto profil */}
+            <SecTitle>🖼 Foto Profil</SecTitle>
+            <Card onClick={()=>setSubPanel("avatar")} style={{marginBottom:16,cursor:"pointer",display:"flex",alignItems:"center",gap:14}}>
+              <Avatar user={currentUser} size={52}/>
+              <div style={{flex:1}}>
+                <div style={{fontWeight:700,fontSize:14}}>Edit Foto Profil</div>
+                <div style={{fontSize:12,color:"#555",marginTop:2}}>{currentUser.avatar?"Tap untuk ganti foto":"Belum ada foto — tap untuk upload"}</div>
+              </div>
+              <span style={{color:"#555",fontSize:18}}>›</span>
+            </Card>
+
+            {/* Referral code */}
+            <SecTitle>👥 Referral Saya</SecTitle>
+            <Card style={{marginBottom:16}}>
+              <div style={{fontSize:11,color:"#4ade80",fontWeight:700,letterSpacing:2,marginBottom:8}}>KODE REFERRAL</div>
+              <div style={{fontSize:22,fontWeight:800,color:"#4ade80",letterSpacing:4,fontFamily:"monospace",marginBottom:8}}>{currentUser.referralCode}</div>
+              <div style={{fontSize:12,color:"#555"}}>{(currentUser.referrals||[]).length} teman diajak · tap untuk detail</div>
+              <div style={{marginTop:12}}><Btn small variant="ghost" onClick={()=>setSubPanel("referral")}>Lihat Detail Referral →</Btn></div>
+            </Card>
+
+            {/* Logout */}
+            <Btn variant="danger" onClick={logout}>Logout</Btn>
+            <div style={{height:16}}/>
           </div>
         </>}
 
