@@ -1,0 +1,1455 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+  <meta name="theme-color" content="#9333ea"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+  <meta name="apple-mobile-web-app-title" content="Northgate"/>
+  <meta name="description" content="Northgate Sales Network — LustBurnPoint System"/>
+  <link rel="manifest" href="manifest.json"/>
+  <link rel="apple-touch-icon" href="icons/icon-192.png"/>
+  <link rel="apple-touch-icon" sizes="180x180" href="icons/icon-180.png"/>
+  <link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png"/>
+  <title>Northgate Sales</title>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    html,body{height:100%;background:#07070f}
+    #root{height:100%;min-height:100vh}
+    #splash{position:fixed;inset:0;background:radial-gradient(ellipse at 30% 0%,#1a0533 0%,#07070f 60%);display:flex;flex-direction:column;align-items:center;justify-content:center;color:#e0e0e0;font-family:system-ui,sans-serif;z-index:9999;transition:opacity 0.4s ease}
+    #splash.hide{opacity:0;pointer-events:none}
+    .sp-icon{font-size:52px;margin-bottom:14px;animation:pulse 2s infinite}
+    .sp-title{font-size:30px;font-weight:800;background:linear-gradient(135deg,#e8e8e8,#9333ea);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:6px}
+    .sp-sub{font-size:11px;letter-spacing:5px;color:#9333ea;text-transform:uppercase;margin-bottom:48px}
+    .sp-dots{display:flex;gap:8px}
+    .sp-dots span{width:8px;height:8px;border-radius:50%;background:#9333ea;animation:bounce 1.2s infinite}
+    .sp-dots span:nth-child(2){animation-delay:.2s}
+    .sp-dots span:nth-child(3){animation-delay:.4s}
+    @keyframes bounce{0%,80%,100%{transform:scale(0.6);opacity:0.4}40%{transform:scale(1);opacity:1}}
+    @keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.08)}}
+  </style>
+</head>
+<body>
+  <div id="splash">
+    <div class="sp-icon">◈</div>
+    <div class="sp-title">NORTHGATE</div>
+    <div class="sp-sub">Sales Network</div>
+    <div class="sp-dots"><span></span><span></span><span></span></div>
+  </div>
+  <div id="root"></div>
+
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <script>
+    function hideSplash(){var s=document.getElementById('splash');if(s){s.classList.add('hide');setTimeout(function(){s.style.display='none'},500);}}
+    setTimeout(hideSplash,15000);
+    if('serviceWorker' in navigator){window.addEventListener('load',function(){navigator.serviceWorker.register('sw.js').catch(function(){});});}
+  </script>
+
+  <script type="text/babel">
+const { useState, useEffect } = React;
+
+// ══════════════════════════════════════════════════════════════════════════════
+//  BUSINESS LOGIC
+//  Harga jual      : Rp 40.000 / produk
+//  Setoran admin   : Rp 21.500 / produk  (otomatis)
+//  Profit user     : Rp 18.500 / produk  (flat, masuk wallet)
+//  1 LBP           = Rp 500              (bisa dikonversi ke wallet)
+//  LBP base/sale   : 5 LBP / produk
+//  Member card     : BONUS LBP tambahan per sale (BUKAN bonus Rupiah)
+//  Bonus wallet    : HANYA dari event
+// ══════════════════════════════════════════════════════════════════════════════
+const HARGA_JUAL         = 40000;
+const SETORAN_PER_PRODUK = 21500;
+const PROFIT_PER_PRODUK  = 18500;
+const LBP_TO_IDR         = 500;
+const LBP_BASE_PER_SALE  = 5;
+const REFERRAL_LBP_BONUS = 30; // LBP untuk referrer saat referee jual pertama kali
+
+const MEMBER_CARDS = [
+  { id:"bronze",  name:"Bronze Card",  icon:"🥉", color:"#cd7f32", price:50,
+    target:10,  lbpBonus:2,  referralPct:0,
+    perks:["Target 10 penjualan/bulan","+2 LBP/produk (total 7 LBP)","Akses dashboard basic","Badge Bronze Member"] },
+  { id:"silver",  name:"Silver Card",  icon:"🥈", color:"#c0c0c0", price:120,
+    target:25,  lbpBonus:5,  referralPct:50,
+    perks:["Target 25 penjualan/bulan","+5 LBP/produk (total 10 LBP)","Priority support","Referral bonus +50 LBP","Badge Silver Member"] },
+  { id:"gold",    name:"Gold Card",    icon:"🥇", color:"#ffd700", price:250,
+    target:50,  lbpBonus:10, referralPct:100,
+    perks:["Target 50 penjualan/bulan","+10 LBP/produk (total 15 LBP)","Akses analytics","Referral bonus +100 LBP","Badge Gold Member"] },
+  { id:"diamond", name:"Diamond Card", icon:"💎", color:"#60efff", price:600,
+    target:100, lbpBonus:20, referralPct:150,
+    perks:["Target 100 penjualan/bulan","+20 LBP/produk (total 25 LBP)","Full analytics + export CSV","Referral bonus +150 LBP","Akses event eksklusif","Badge Diamond Member"] },
+  { id:"master",  name:"Master Card",  icon:"👑", color:"#ff6bff", price:1500,
+    target:200, lbpBonus:45, referralPct:200,
+    perks:["Target 200 penjualan/bulan","+45 LBP/produk (total 50 LBP)","Dashboard eksklusif Master","Referral bonus +200 LBP","Akses VIP + semua event","Diskon stok 15%","Fast-track ke Owner"] },
+];
+
+const ACTIVE_EVENTS = [
+  { id:"e1", title:"🔥 Flash Sale Weekend",  desc:"Bonus LBP ×2 setiap penjualan Sabtu & Minggu",               reward:"+2× LBP",   color:"#ff6b6b", expiresDate:"2026-03-08", type:"lbp"    },
+  { id:"e2", title:"⭐ Star Seller March",   desc:"Capai 50 penjualan bulan ini → bonus 200 LBP",               reward:"+200 LBP",  color:"#ffd700", expiresDate:"2026-03-31", type:"lbp"    },
+  { id:"e3", title:"💎 Diamond Rush",        desc:"Naik ke tier Diamond bulan ini → bonus Rp 50.000 ke wallet",  reward:"+Rp 50K",   color:"#60efff", expiresDate:"2026-03-31", type:"wallet" },
+  { id:"e4", title:"🎯 New Member Boost",   desc:"User baru jual 10 produk minggu ini → bonus Rp 25.000",       reward:"+Rp 25K",   color:"#4ade80", expiresDate:"2026-03-10", type:"wallet" },
+];
+
+const DB = {
+  users: [
+    { id:"admin", username:"Northgate", password:"0825",   role:"admin",
+      lbp:9999, sales:0,  stock:0,   wallet:0, soldToday:0,
+      joinDate:"2024-01-01", memberCard:null, ownedCards:[], setoran:0, withdrawn:0,
+      stockRequests:[], lbpHistory:[], salesHistory:[], referralCode:"ADMIN00",
+      referredBy:null, referrals:[], monthlySales:0 },
+    { id:"gopal", username:"Gopal",     password:"010101", role:"user",
+      lbp:2500, sales:87, stock:120, wallet:1609500, soldToday:5,
+      joinDate:"2025-06-15", memberCard:null, ownedCards:[], setoran:1870500, withdrawn:0,
+      stockRequests:[], lbpHistory:[
+        {type:"earn",amount:435,desc:"87 produk terjual",date:"2026-03-01"},
+        {type:"earn",amount:20,desc:"Bonus signup",date:"2025-06-15"},
+      ], salesHistory:[
+        {qty:5,profit:92500,lbp:25,date:"2026-03-06"},
+        {qty:12,profit:222000,lbp:60,date:"2026-03-05"},
+      ], referralCode:"GOPAL87",
+      referredBy:null, referrals:[], monthlySales:17 },
+  ],
+  settings: { newUserBonus:20 },
+};
+
+// ─── HELPERS ───────────────────────────────────────────────────────────────────
+const generateCode = (username) => (username.toUpperCase().replace(/[^A-Z0-9]/g,"").slice(0,5) + Math.floor(Math.random()*90+10)).slice(0,8);
+
+const fmt  = (n) => `Rp${Number(n||0).toLocaleString("id-ID")}`;
+const fmtK = (n) => { n=n||0; return n>=1000000?`Rp${(n/1e6).toFixed(1)}Jt`:n>=1000?`Rp${(n/1000).toFixed(0)}K`:`Rp${n}`; };
+const ff   = "system-ui,-apple-system,'Segoe UI',sans-serif";
+
+const getRank = (lbp) => {
+  if (lbp>=2500) return {label:"👑 Master",  color:"#ff6bff"};
+  if (lbp>=1000) return {label:"💎 Diamond", color:"#60efff"};
+  if (lbp>=500)  return {label:"🥇 Gold",    color:"#ffd700"};
+  if (lbp>=250)  return {label:"🥈 Silver",  color:"#c0c0c0"};
+  if (lbp>=100)  return {label:"🥉 Bronze",  color:"#cd7f32"};
+  return               {label:"🌱 Starter",  color:"#7fff7f"};
+};
+
+// Countdown helper
+const getCountdown = (expiresDate) => {
+  const diff = new Date(expiresDate+" 23:59:59") - new Date();
+  if (diff <= 0) return "Berakhir";
+  const d = Math.floor(diff/86400000);
+  const h = Math.floor((diff%86400000)/3600000);
+  const m = Math.floor((diff%3600000)/60000);
+  if (d > 0) return `${d}h ${h}j lagi`;
+  if (h > 0) return `${h}j ${m}m lagi`;
+  return `${m}m lagi`;
+};
+
+// Export CSV
+const exportCSV = (rows, filename) => {
+  const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g,'""')}"`).join(",")).join("\n");
+  const blob = new Blob(["\uFEFF"+csv], {type:"text/csv;charset=utf-8;"});
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement("a");
+  a.href=url; a.download=filename; a.click();
+  URL.revokeObjectURL(url);
+};
+
+// ─── LBP COIN ─────────────────────────────────────────────────────────────────
+const LBPCoin = ({size=18,style={}}) => (
+  <svg width={size} height={size} viewBox="0 0 32 32" style={{display:"inline-block",verticalAlign:"middle",flexShrink:0,...style}}>
+    <defs>
+      <radialGradient id="coinGrad" cx="40%" cy="35%" r="65%">
+        <stop offset="0%" stopColor="#ffe066"/>
+        <stop offset="55%" stopColor="#ffd700"/>
+        <stop offset="100%" stopColor="#b8860b"/>
+      </radialGradient>
+      <radialGradient id="coinShine" cx="35%" cy="30%" r="50%">
+        <stop offset="0%" stopColor="#fff8" stopOpacity="0.7"/>
+        <stop offset="100%" stopColor="#fff0" stopOpacity="0"/>
+      </radialGradient>
+    </defs>
+    <circle cx="16" cy="17" r="13" fill="#7a5800" opacity="0.5"/>
+    <circle cx="16" cy="15.5" r="13" fill="url(#coinGrad)"/>
+    <circle cx="16" cy="15.5" r="13" fill="none" stroke="#c8960a" strokeWidth="1.2"/>
+    <circle cx="16" cy="15.5" r="10.5" fill="none" stroke="#e8a900" strokeWidth="0.8" opacity="0.7"/>
+    <text x="16" y="20.5" textAnchor="middle" fontSize="12" fontWeight="900" fontFamily="system-ui,sans-serif" fill="#7a5800" opacity="0.35" letterSpacing="-0.5">LBP</text>
+    <text x="16" y="20" textAnchor="middle" fontSize="12" fontWeight="900" fontFamily="system-ui,sans-serif" fill="#5c3d00" letterSpacing="-0.5">LBP</text>
+    <circle cx="16" cy="15.5" r="13" fill="url(#coinShine)"/>
+  </svg>
+);
+
+const LBPDisplay = ({amount,size=16,fontSize=14,color="#ffd700",style={}}) => (
+  <span style={{display:"inline-flex",alignItems:"center",gap:4,...style}}>
+    <LBPCoin size={size}/>
+    <span style={{fontSize,fontWeight:800,color,lineHeight:1}}>{typeof amount==="number"?amount.toLocaleString("id-ID"):amount}</span>
+  </span>
+);
+
+// ─── UI PRIMITIVES ─────────────────────────────────────────────────────────────
+const Toast = ({msg}) => msg?(
+  <div style={{position:"fixed",bottom:82,left:"50%",transform:"translateX(-50%)",background:msg.t==="e"?"rgba(220,38,38,0.97)":"rgba(22,163,74,0.97)",color:"#fff",padding:"12px 24px",borderRadius:30,fontSize:13,fontWeight:700,zIndex:9999,whiteSpace:"nowrap",boxShadow:"0 6px 28px rgba(0,0,0,0.5)",backdropFilter:"blur(12px)"}}>
+    {msg.t==="e"?"⚠ ":"✓ "}{msg.m}
+  </div>
+):null;
+
+const Badge = ({c,children,sm}) => (
+  <span style={{display:"inline-block",padding:sm?"2px 9px":"4px 13px",borderRadius:20,fontSize:sm?10:11,fontWeight:700,background:`${c}22`,color:c,border:`1px solid ${c}45`}}>{children}</span>
+);
+
+const Card = ({children,style,onClick}) => (
+  <div onClick={onClick} style={{background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:18,padding:18,cursor:onClick?"pointer":undefined,...style}}>{children}</div>
+);
+
+const SecTitle = ({children,color}) => (
+  <div style={{fontSize:11,fontWeight:700,color:color||"#9333ea",letterSpacing:2,textTransform:"uppercase",marginBottom:14}}>{children}</div>
+);
+
+const Inp = ({label,...p}) => (
+  <div style={{marginBottom:16}}>
+    {label&&<div style={{fontSize:11,fontWeight:700,color:"#666",letterSpacing:1,textTransform:"uppercase",marginBottom:7}}>{label}</div>}
+    <input {...p} style={{width:"100%",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.11)",borderRadius:12,padding:"14px 16px",color:"#e8e8e8",fontSize:16,outline:"none",boxSizing:"border-box",fontFamily:ff,WebkitAppearance:"none",...p.style}}/>
+  </div>
+);
+
+const Btn = ({children,onClick,variant="primary",disabled,style,small}) => (
+  <button onClick={onClick} disabled={disabled} style={{width:"100%",padding:small?"11px":"16px",borderRadius:14,border:"none",cursor:disabled?"not-allowed":"pointer",fontSize:small?13:15,fontWeight:700,fontFamily:ff,opacity:disabled?0.4:1,
+    ...(variant==="primary"?{background:"linear-gradient(135deg,#7c3aed,#9333ea)",color:"#fff",boxShadow:"0 4px 20px rgba(147,51,234,0.35)"}:{}),
+    ...(variant==="ghost"  ?{background:"rgba(147,51,234,0.1)",color:"#c084fc",border:"1px solid rgba(147,51,234,0.3)"}:{}),
+    ...(variant==="danger" ?{background:"rgba(239,68,68,0.1)",color:"#ef4444",border:"1px solid rgba(239,68,68,0.3)"}:{}),
+    ...(variant==="success"?{background:"rgba(34,197,94,0.15)",color:"#4ade80",border:"1px solid rgba(34,197,94,0.3)"}:{}),
+    ...(variant==="warn"   ?{background:"rgba(251,191,36,0.12)",color:"#fbbf24",border:"1px solid rgba(251,191,36,0.3)"}:{}),
+    ...style}}>{children}</button>
+);
+
+const BottomNav = ({items,active,onNav}) => (
+  <div style={{position:"fixed",bottom:0,left:0,right:0,maxWidth:480,margin:"0 auto",background:"rgba(8,6,18,0.97)",borderTop:"1px solid rgba(255,255,255,0.07)",display:"flex",zIndex:200,paddingBottom:"env(safe-area-inset-bottom,6px)",backdropFilter:"blur(24px)"}}>
+    {items.map(n=>(
+      <div key={n.id} onClick={()=>onNav(n.id)} style={{flex:1,padding:"10px 4px 8px",display:"flex",flexDirection:"column",alignItems:"center",gap:3,cursor:"pointer"}}>
+        <div style={{fontSize:22,lineHeight:1}}>{n.icon}</div>
+        <div style={{fontSize:10,fontWeight:700,letterSpacing:0.5,color:active===n.id?"#c084fc":"#3a3a4a"}}>{n.label}</div>
+        {active===n.id&&<div style={{width:4,height:4,borderRadius:"50%",background:"#9333ea"}}/>}
+      </div>
+    ))}
+  </div>
+);
+
+const BackHeader = ({title,sub,accent,onBack}) => (
+  <div style={{background:accent?`linear-gradient(160deg,${accent}22,#07070f)`:"linear-gradient(160deg,#1a0533,#07070f)",padding:"48px 20px 20px"}}>
+    <button onClick={onBack} style={{background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:10,padding:"8px 16px",color:"#bbb",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:ff,marginBottom:18}}>← Kembali</button>
+    <div style={{fontSize:11,color:accent||"#9333ea",fontWeight:700,letterSpacing:2,textTransform:"uppercase"}}>◈ {sub}</div>
+    <div style={{fontSize:24,fontWeight:800,color:"#e0e0e0",marginTop:4}}>{title}</div>
+  </div>
+);
+
+const InfoRow = ({label,value,color,border=true}) => (
+  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"11px 0",borderBottom:border?"1px solid rgba(255,255,255,0.05)":"none"}}>
+    <span style={{fontSize:13,color:"#888"}}>{label}</span>
+    <span style={{fontSize:13,fontWeight:700,color:color||"#e0e0e0"}}>{value}</span>
+  </div>
+);
+
+// ── Progress Bar Component ─────────────────────────────────────────────────────
+const ProgressBar = ({pct,color,height=8}) => (
+  <div style={{background:"rgba(255,255,255,0.06)",borderRadius:100,height,overflow:"hidden"}}>
+    <div style={{height:"100%",width:`${Math.min(100,pct)}%`,background:`linear-gradient(90deg,${color}80,${color})`,borderRadius:100,transition:"width 0.4s ease"}}/>
+  </div>
+);
+
+// ── Monthly Target Card ────────────────────────────────────────────────────────
+const MonthlyTarget = ({user,myCard}) => {
+  if(!myCard) return null;
+  const target = myCard.target;
+  const current = user.monthlySales || 0;
+  const pct = Math.min(100, Math.round((current/target)*100));
+  const remaining = Math.max(0, target - current);
+  return (
+    <Card style={{marginBottom:16,border:`1px solid ${myCard.color}30`,background:`linear-gradient(135deg,${myCard.color}06,transparent)`}}>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
+        <div>
+          <div style={{fontSize:11,color:myCard.color,fontWeight:700,letterSpacing:1,textTransform:"uppercase",marginBottom:2}}>🎯 Target Bulanan</div>
+          <div style={{fontSize:13,color:"#888"}}>{myCard.name} · {target} penjualan</div>
+        </div>
+        <div style={{textAlign:"right"}}>
+          <div style={{fontSize:22,fontWeight:800,color:pct>=100?"#4ade80":myCard.color}}>{pct}%</div>
+          <div style={{fontSize:11,color:"#555"}}>{current}/{target}</div>
+        </div>
+      </div>
+      <ProgressBar pct={pct} color={pct>=100?"#4ade80":myCard.color}/>
+      {pct>=100
+        ?<div style={{marginTop:8,fontSize:12,color:"#4ade80",fontWeight:700,textAlign:"center"}}>✅ Target tercapai! Lanjutkan terus 🔥</div>
+        :<div style={{marginTop:8,fontSize:12,color:"#666"}}>Butuh <span style={{color:myCard.color,fontWeight:700}}>{remaining} lagi</span> untuk capai target bulan ini</div>
+      }
+    </Card>
+  );
+};
+
+// ── LBP History Panel ──────────────────────────────────────────────────────────
+const LBPHistoryPanel = ({history,onBack}) => (
+  <div style={{minHeight:"100vh",background:"#07070f",fontFamily:ff,color:"#e0e0e0",paddingBottom:32,maxWidth:480,margin:"0 auto"}}>
+    <BackHeader title="Riwayat LBP" sub="LustBurnPoints" accent="#ffd700" onBack={onBack}/>
+    <div style={{padding:"16px 16px"}}>
+      {(!history||history.length===0)
+        ?<Card><div style={{textAlign:"center",padding:"24px 0",color:"#444",fontSize:14}}>Belum ada riwayat LBP</div></Card>
+        :history.slice().reverse().map((h,i)=>(
+          <div key={i} style={{display:"flex",alignItems:"center",gap:14,padding:"12px 0",borderBottom:"1px solid rgba(255,255,255,0.05)"}}>
+            <div style={{width:40,height:40,borderRadius:12,background:h.type==="earn"?"rgba(34,197,94,0.12)":h.type==="spend"?"rgba(239,68,68,0.1)":"rgba(192,132,252,0.1)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0}}>
+              {h.type==="earn"?"📈":h.type==="spend"?"🛒":"💱"}
+            </div>
+            <div style={{flex:1}}>
+              <div style={{fontSize:13,fontWeight:600,color:"#ddd"}}>{h.desc}</div>
+              <div style={{fontSize:11,color:"#555",marginTop:2}}>{h.date}</div>
+            </div>
+            <LBPDisplay amount={(h.type==="earn"||h.type==="referral"?"+":"-")+h.amount} size={14} fontSize={14} color={h.type==="earn"||h.type==="referral"?"#4ade80":"#ef4444"}/>
+          </div>
+        ))
+      }
+    </div>
+  </div>
+);
+
+// ── Referral Panel ─────────────────────────────────────────────────────────────
+const ReferralPanel = ({user,myCard,users,onBack,showToast}) => {
+  const [copied,setCopied] = useState(false);
+  const referrals = users.filter(u=>u.referredBy===user.id);
+  const totalEarned = (user.lbpHistory||[]).filter(h=>h.type==="referral").reduce((s,h)=>s+h.amount,0);
+
+  const copyCode = () => {
+    navigator.clipboard.writeText(user.referralCode||"").then(()=>{
+      setCopied(true); setTimeout(()=>setCopied(false),2000);
+      showToast("s","Kode referral disalin!");
+    }).catch(()=>showToast("e","Gagal menyalin"));
+  };
+
+  const bonusPerRef = myCard ? (REFERRAL_LBP_BONUS + Math.round(REFERRAL_LBP_BONUS * myCard.referralPct/100)) : REFERRAL_LBP_BONUS;
+
+  return (
+    <div style={{minHeight:"100vh",background:"#07070f",fontFamily:ff,color:"#e0e0e0",paddingBottom:32,maxWidth:480,margin:"0 auto"}}>
+      <BackHeader title="Referral" sub="Ajak Teman" accent="#4ade80" onBack={onBack}/>
+      <div style={{padding:"16px 16px"}}>
+        {/* Kode referral */}
+        <Card style={{marginBottom:16,background:"linear-gradient(135deg,rgba(34,197,94,0.1),transparent)",border:"1px solid rgba(34,197,94,0.25)"}}>
+          <div style={{fontSize:11,color:"#4ade80",fontWeight:700,letterSpacing:2,marginBottom:8}}>KODE REFERRAL KAMU</div>
+          <div style={{display:"flex",alignItems:"center",gap:12}}>
+            <div style={{flex:1,background:"rgba(255,255,255,0.06)",borderRadius:12,padding:"14px 16px",fontSize:22,fontWeight:800,color:"#4ade80",letterSpacing:4,fontFamily:"monospace"}}>{user.referralCode}</div>
+            <button onClick={copyCode} style={{background:copied?"rgba(34,197,94,0.2)":"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:12,padding:"14px 18px",color:copied?"#4ade80":"#bbb",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:ff,flexShrink:0}}>
+              {copied?"✓ Disalin":"Salin"}
+            </button>
+          </div>
+          <div style={{marginTop:10,fontSize:12,color:"#555"}}>Bagikan kode ini ke teman. Kamu dapat <span style={{color:"#4ade80",fontWeight:700}}>+{bonusPerRef} LBP</span> tiap kali teman kamu jual produk pertama.</div>
+        </Card>
+
+        {/* Bonus info */}
+        <Card style={{marginBottom:16}}>
+          <div style={{fontSize:11,color:"#9333ea",fontWeight:700,letterSpacing:2,marginBottom:12}}>💰 POTENSI PENGHASILAN</div>
+          <InfoRow label="Bonus per referral (base)" value={`+${REFERRAL_LBP_BONUS} LBP`} color="#4ade80"/>
+          <InfoRow label={`Bonus card ${myCard?myCard.name:"(no card)"}`} value={myCard?`+${Math.round(REFERRAL_LBP_BONUS*myCard.referralPct/100)} LBP`:"—"} color={myCard?.color||"#555"}/>
+          <InfoRow label="Total per referral" value={`+${bonusPerRef} LBP = ${fmt(bonusPerRef*LBP_TO_IDR)}`} color="#ffd700"/>
+          <InfoRow label="Total LBP dari referral" value={totalEarned} color="#4ade80" border={false}/>
+        </Card>
+
+        {/* Referrals list */}
+        <SecTitle>👥 Teman yang Diajak ({referrals.length})</SecTitle>
+        {referrals.length===0
+          ?<Card><div style={{textAlign:"center",padding:"20px 0",color:"#444",fontSize:13}}>Belum ada teman yang join pakai kode kamu 🥲<br/><span style={{fontSize:11,marginTop:6,display:"block"}}>Share kode kamu sekarang!</span></div></Card>
+          :referrals.map(r=>{
+            const rk=getRank(r.lbp);
+            return (
+              <Card key={r.id} style={{marginBottom:10,display:"flex",alignItems:"center",gap:12}}>
+                <div style={{width:40,height:40,borderRadius:"50%",background:`linear-gradient(135deg,${rk.color},#07070f)`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,fontWeight:800,border:`2px solid ${rk.color}40`}}>{r.username[0]}</div>
+                <div style={{flex:1}}>
+                  <div style={{fontWeight:700,fontSize:14}}>{r.username}</div>
+                  <Badge c={rk.color} sm>{rk.label}</Badge>
+                </div>
+                <div style={{textAlign:"right"}}>
+                  <div style={{fontSize:12,color:"#4ade80",fontWeight:700}}>{r.sales} sales</div>
+                  <div style={{fontSize:10,color:"#555"}}>sejak {r.joinDate}</div>
+                </div>
+              </Card>
+            );
+          })
+        }
+      </div>
+    </div>
+  );
+};
+
+const pageStyle = {minHeight:"100vh",background:"#07070f",fontFamily:ff,color:"#e0e0e0",paddingBottom:76,maxWidth:480,margin:"0 auto",position:"relative"};
+
+// ══════════════════════════════════════════════════════════════════════════════
+//  APP
+// ══════════════════════════════════════════════════════════════════════════════
+function App() {
+  const [users,      setUsers]      = useState(DB.users);
+  const [settings,   setSettings]   = useState(DB.settings);
+  const [screen,     setScreen]     = useState("login");
+  const [currentUser,setCurrentUser]= useState(null);
+  const [activeNav,  setActiveNav]  = useState("home");
+  const [subPanel,   setSubPanel]   = useState(null);
+  const [adminSub,   setAdminSub]   = useState(null);
+  const [shopDetail, setShopDetail] = useState(null);
+  const [toast,      setToast]      = useState(null);
+  const [tick,       setTick]       = useState(0); // for countdown refresh
+
+  // Auth fields
+  const [lUser,setLUser]=useState(""); const [lPass,setLPass]=useState(""); const [lErr,setLErr]=useState("");
+  const [rUser,setRUser]=useState(""); const [rPass,setRPass]=useState(""); const [rPass2,setRPass2]=useState(""); const [rErr,setRErr]=useState("");
+  const [rRef, setRRef] =useState("");
+
+  // Admin fields
+  const [lbpEdit,  setLbpEdit]  = useState({});
+  const [stockEdit,setStockEdit]= useState({});
+
+  // User fields
+  const [formSold,  setFormSold]  = useState("");
+  const [formStock, setFormStock] = useState("");
+  const [formWd,    setFormWd]    = useState("");
+  const [lbpConv,   setLbpConv]   = useState("");
+
+  const showToast = (t,m,dur=3000)=>{ setToast({t,m}); setTimeout(()=>setToast(null),dur); };
+
+  // Countdown ticker
+  useEffect(()=>{
+    const id=setInterval(()=>setTick(p=>p+1),60000);
+    return ()=>clearInterval(id);
+  },[]);
+
+  const updateUser = (id,patch) => {
+    const upd = users.map(u=>u.id===id?{...u,...patch}:u);
+    setUsers(upd); DB.users=upd;
+    if(currentUser?.id===id) setCurrentUser(p=>({...p,...patch}));
+  };
+
+  const login = () => {
+    const f=users.find(u=>u.username===lUser&&u.password===lPass);
+    if(!f){setLErr("Username atau password salah!"); return;}
+    setCurrentUser(f); setScreen(f.role==="admin"?"adminDash":"userDash"); setActiveNav("home"); setSubPanel(null); setAdminSub(null);
+  };
+
+  const register = () => {
+    if(!rUser||!rPass||!rPass2){setRErr("Semua field wajib diisi!"); return;}
+    if(rPass!==rPass2){setRErr("Password tidak cocok!"); return;}
+    if(users.find(u=>u.username.toLowerCase()===rUser.toLowerCase())){setRErr("Username sudah dipakai!"); return;}
+    
+    let referrerId = null;
+    if(rRef.trim()) {
+      const referrer = users.find(u=>u.referralCode===rRef.trim().toUpperCase());
+      if(!referrer){setRErr("Kode referral tidak valid!"); return;}
+      referrerId = referrer.id;
+    }
+    
+    const code = generateCode(rUser);
+    const nu={
+      id:Date.now().toString(), username:rUser, password:rPass, role:"user",
+      lbp:settings.newUserBonus, sales:0, stock:100, wallet:0, soldToday:0,
+      joinDate:new Date().toISOString().split("T")[0], memberCard:null, ownedCards:[],
+      setoran:0, withdrawn:0, stockRequests:[],
+      lbpHistory:[{type:"earn",amount:settings.newUserBonus,desc:"Bonus signup",date:new Date().toLocaleDateString("id-ID")}],
+      salesHistory:[], referralCode:code, referredBy:referrerId, referrals:[], monthlySales:0
+    };
+    
+    let updatedUsers = [...users, nu];
+    // If referred, add referral to referrer's list (bonus granted on first sale)
+    if(referrerId) {
+      updatedUsers = updatedUsers.map(u=>u.id===referrerId?{...u,referrals:[...(u.referrals||[]),nu.id]}:u);
+    }
+    
+    setUsers(updatedUsers); DB.users=updatedUsers;
+    showToast("s",`Akun berhasil! Bonus ${settings.newUserBonus} LBP 🎉${referrerId?" + Kode referral valid!":""}`);
+    setTimeout(()=>{setScreen("login");setRUser("");setRPass("");setRPass2("");setRRef("");setRErr("");},1800);
+  };
+
+  const logout = ()=>{ setCurrentUser(null); setScreen("login"); setLUser(""); setLPass(""); setLErr(""); setSubPanel(null); setAdminSub(null); };
+
+  // ── Sell logic ───────────────────────────────────────────────────────────────
+  const submitSales = () => {
+    const sold  = parseInt(formSold)||0;
+    const stock = parseInt(formStock)||0;
+    if(sold<0||stock<0){showToast("e","Nilai tidak boleh negatif!"); return;}
+    if(sold>0&&sold>currentUser.stock){showToast("e","Unit melebihi stok tersedia!"); return;}
+    
+    const myCard   = MEMBER_CARDS.find(c=>c.id===currentUser.memberCard);
+    const lbpGain  = (LBP_BASE_PER_SALE + (myCard?.lbpBonus||0)) * sold;
+    const profit   = PROFIT_PER_PRODUK * sold;
+    const setorAuto= SETORAN_PER_PRODUK * sold;
+    const reqs     = stock>0?[...(currentUser.stockRequests||[]),{qty:stock,date:new Date().toLocaleDateString("id-ID"),status:"Menunggu"}]:(currentUser.stockRequests||[]);
+    const today    = new Date().toLocaleDateString("id-ID");
+    
+    // Add to LBP history
+    const newLbpHistory = sold>0 ? [...(currentUser.lbpHistory||[]),{type:"earn",amount:lbpGain,desc:`${sold} produk terjual`,date:today}] : (currentUser.lbpHistory||[]);
+    // Add to sales history
+    const newSalesHistory = sold>0 ? [...(currentUser.salesHistory||[]),{qty:sold,profit,lbp:lbpGain,date:today}] : (currentUser.salesHistory||[]);
+    
+    updateUser(currentUser.id,{
+      stock:         currentUser.stock - sold,
+      sales:         currentUser.sales + sold,
+      soldToday:     currentUser.soldToday + sold,
+      monthlySales:  (currentUser.monthlySales||0) + sold,
+      wallet:        (currentUser.wallet||0) + profit,
+      lbp:           currentUser.lbp + lbpGain,
+      setoran:       (currentUser.setoran||0) + setorAuto,
+      stockRequests: reqs,
+      lbpHistory:    newLbpHistory,
+      salesHistory:  newSalesHistory,
+    });
+
+    // Referral bonus: if this is user's first ever sale, reward referrer
+    if(currentUser.sales===0 && sold>0 && currentUser.referredBy) {
+      const referrer = users.find(u=>u.id===currentUser.referredBy);
+      if(referrer) {
+        const refCard = MEMBER_CARDS.find(c=>c.id===referrer.memberCard);
+        const refBonus = REFERRAL_LBP_BONUS + Math.round(REFERRAL_LBP_BONUS*(refCard?.referralPct||0)/100);
+        const refHistory = [...(referrer.lbpHistory||[]),{type:"referral",amount:refBonus,desc:`Referral: ${currentUser.username} jual pertama`,date:today}];
+        updateUser(referrer.id,{lbp:referrer.lbp+refBonus,lbpHistory:refHistory});
+      }
+    }
+
+    showToast("s",`${sold>0?`${sold} unit terjual! +${lbpGain} LBP, +${fmt(profit)} wallet. `:""}${stock>0?`Permintaan ${stock} stok dikirim.`:""}`);
+    setFormSold(""); setFormStock(""); setSubPanel(null);
+  };
+
+  const submitWithdraw = () => {
+    const amt = parseInt(formWd)||0;
+    const w   = currentUser.wallet||0;
+    if(amt<=0){showToast("e","Masukkan jumlah yang valid!"); return;}
+    if(amt>w){showToast("e",`Saldo tidak cukup! Maks ${fmt(w)}`); return;}
+    updateUser(currentUser.id,{wallet:w-amt,withdrawn:(currentUser.withdrawn||0)+amt});
+    showToast("s",`Withdraw ${fmt(amt)} berhasil diajukan!`);
+    setFormWd(""); setSubPanel(null);
+  };
+
+  const submitLbpConvert = () => {
+    const lbp = parseInt(lbpConv)||0;
+    if(lbp<=0){showToast("e","Masukkan jumlah LBP yang valid!"); return;}
+    if(lbp>currentUser.lbp){showToast("e","LBP tidak cukup!"); return;}
+    const idr = lbp * LBP_TO_IDR;
+    const today = new Date().toLocaleDateString("id-ID");
+    const newLbpHistory = [...(currentUser.lbpHistory||[]),{type:"convert",amount:lbp,desc:`Konversi ke Rupiah → ${fmt(idr)}`,date:today}];
+    updateUser(currentUser.id,{lbp:currentUser.lbp-lbp,wallet:(currentUser.wallet||0)+idr,lbpHistory:newLbpHistory});
+    showToast("s",`${lbp} LBP → ${fmt(idr)} masuk wallet!`);
+    setLbpConv("");
+  };
+
+  const buyCard = (card) => {
+    if(currentUser.ownedCards?.includes(card.id)){showToast("e","Kartu ini sudah kamu miliki!"); return;}
+    if(currentUser.lbp<card.price){showToast("e",`LBP tidak cukup! Butuh ${card.price} LBP.`); return;}
+    const today = new Date().toLocaleDateString("id-ID");
+    const newLbpHistory = [...(currentUser.lbpHistory||[]),{type:"spend",amount:card.price,desc:`Beli ${card.name}`,date:today}];
+    updateUser(currentUser.id,{lbp:currentUser.lbp-card.price,ownedCards:[...(currentUser.ownedCards||[]),card.id],memberCard:card.id,lbpHistory:newLbpHistory});
+    showToast("s",`${card.icon} ${card.name} berhasil dibeli!`);
+    setShopDetail(null);
+  };
+
+  const nonAdmin = users.filter(u=>u.role!=="admin");
+  const sorted   = [...nonAdmin].sort((a,b)=>b.lbp-a.lbp);
+  const totalSetoran = nonAdmin.reduce((s,u)=>s+(u.setoran||0),0);
+  const totalSales   = nonAdmin.reduce((s,u)=>s+u.sales,0);
+
+  // ════════════════════════════════════════════════════════════════════════════
+  //  AUTH
+  // ════════════════════════════════════════════════════════════════════════════
+  if(screen==="login") return (
+    <div style={{minHeight:"100vh",background:"radial-gradient(ellipse at 30% 0%,#1a0533 0%,#07070f 60%)",fontFamily:ff,display:"flex",flexDirection:"column",justifyContent:"center",padding:"0 24px"}}>
+      <Toast msg={toast}/>
+      <div style={{textAlign:"center",marginBottom:36}}>
+        <div style={{fontSize:44,marginBottom:10}}>◈</div>
+        <div style={{fontSize:11,letterSpacing:6,color:"#9333ea",textTransform:"uppercase",marginBottom:6}}>Sales Network</div>
+        <div style={{fontSize:32,fontWeight:800,background:"linear-gradient(135deg,#e8e8e8,#9333ea)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>NORTHGATE</div>
+      </div>
+      {lErr&&<div style={{background:"rgba(239,68,68,0.1)",border:"1px solid rgba(239,68,68,0.25)",borderRadius:12,padding:"12px 16px",fontSize:13,color:"#ff7070",marginBottom:16,textAlign:"center"}}>⚠ {lErr}</div>}
+      <Inp label="Username" value={lUser} onChange={e=>setLUser(e.target.value)} placeholder="Masukkan username" autoCapitalize="none"/>
+      <Inp label="Password" type="password" value={lPass} onChange={e=>setLPass(e.target.value)} placeholder="Masukkan password" onKeyDown={e=>e.key==="Enter"&&login()}/>
+      <div style={{marginBottom:14}}/>
+      <Btn onClick={login}>Masuk →</Btn>
+      <div style={{display:"flex",alignItems:"center",gap:10,margin:"20px 0",color:"#333",fontSize:12}}><div style={{flex:1,height:1,background:"#1e1e2e"}}/>atau<div style={{flex:1,height:1,background:"#1e1e2e"}}/></div>
+      <Btn onClick={()=>{setScreen("register");setLErr("");}} variant="ghost">Buat Akun Baru</Btn>
+      <div style={{textAlign:"center",marginTop:28,fontSize:10,color:"#222",letterSpacing:2}}>LUSTBURNPOINT SYSTEM v3.0</div>
+    </div>
+  );
+
+  if(screen==="register") return (
+    <div style={{minHeight:"100vh",background:"radial-gradient(ellipse at 30% 0%,#1a0533 0%,#07070f 60%)",fontFamily:ff,display:"flex",flexDirection:"column",justifyContent:"center",padding:"0 24px"}}>
+      <Toast msg={toast}/>
+      <div style={{textAlign:"center",marginBottom:36}}>
+        <div style={{fontSize:44,marginBottom:10}}>✦</div>
+        <div style={{fontSize:11,letterSpacing:6,color:"#9333ea",textTransform:"uppercase",marginBottom:6}}>Sales Network</div>
+        <div style={{fontSize:32,fontWeight:800,background:"linear-gradient(135deg,#e8e8e8,#9333ea)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>DAFTAR</div>
+        <div style={{fontSize:13,color:"#666",marginTop:6,display:"flex",alignItems:"center",justifyContent:"center",gap:5}}>Dapat <LBPDisplay amount={settings.newUserBonus} size={15} fontSize={13}/> = {fmt(settings.newUserBonus*LBP_TO_IDR)} bonus!</div>
+      </div>
+      {rErr&&<div style={{background:"rgba(239,68,68,0.1)",border:"1px solid rgba(239,68,68,0.25)",borderRadius:12,padding:"12px 16px",fontSize:13,color:"#ff7070",marginBottom:16,textAlign:"center"}}>⚠ {rErr}</div>}
+      <Inp label="Username" value={rUser} onChange={e=>setRUser(e.target.value)} placeholder="Pilih username" autoCapitalize="none"/>
+      <Inp label="Password" type="password" value={rPass} onChange={e=>setRPass(e.target.value)} placeholder="Buat password"/>
+      <Inp label="Konfirmasi Password" type="password" value={rPass2} onChange={e=>setRPass2(e.target.value)} placeholder="Ulangi password"/>
+      <Inp label="Kode Referral (opsional)" value={rRef} onChange={e=>setRRef(e.target.value.toUpperCase())} placeholder="Contoh: GOPAL87" style={{textTransform:"uppercase",letterSpacing:2}}/>
+      <div style={{marginBottom:14}}/>
+      <Btn onClick={register} onKeyDown={e=>e.key==="Enter"&&register()}>Buat Akun →</Btn>
+      <div style={{height:12}}/>
+      <Btn onClick={()=>{setScreen("login");setRErr("");}} variant="ghost">← Kembali ke Login</Btn>
+    </div>
+  );
+
+  // ════════════════════════════════════════════════════════════════════════════
+  //  ADMIN DASHBOARD
+  // ════════════════════════════════════════════════════════════════════════════
+  if(screen==="adminDash") {
+    const adminNav = [
+      {id:"home",    icon:"📊", label:"Overview"},
+      {id:"users",   icon:"👥", label:"Users"},
+      {id:"finance", icon:"💰", label:"Keuangan"},
+      {id:"setting", icon:"⚙️", label:"Setting"},
+    ];
+
+    // ── Admin sub-panel ─────────────────────────────────────────────────────
+    if(adminSub) {
+      const {panel,userId} = adminSub;
+      const u = users.find(x=>x.id===userId);
+      if(!u) { setAdminSub(null); return null; }
+      const r = getRank(u.lbp);
+      const card = MEMBER_CARDS.find(c=>c.id===u.memberCard);
+
+      if(panel==="sales") return (
+        <div style={pageStyle}>
+          <Toast msg={toast}/>
+          <BackHeader title={`Penjualan — ${u.username}`} sub="Admin · Detail User" accent="#4ade80" onBack={()=>setAdminSub(null)}/>
+          <div style={{padding:"20px 16px"}}>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:16}}>
+              <Card><div style={{fontSize:10,color:"#4ade80",fontWeight:700,letterSpacing:1,marginBottom:6}}>TOTAL TERJUAL</div><div style={{fontSize:28,fontWeight:800,color:"#4ade80"}}>{u.sales}</div><div style={{fontSize:11,color:"#555"}}>unit (all time)</div></Card>
+              <Card><div style={{fontSize:10,color:"#60efff",fontWeight:700,letterSpacing:1,marginBottom:6}}>TERJUAL HARI INI</div><div style={{fontSize:28,fontWeight:800,color:"#60efff"}}>{u.soldToday}</div><div style={{fontSize:11,color:"#555"}}>unit hari ini</div></Card>
+              <Card><div style={{fontSize:10,color:"#f97316",fontWeight:700,letterSpacing:1,marginBottom:6}}>STOK SAAT INI</div><div style={{fontSize:28,fontWeight:800,color:"#f97316"}}>{u.stock}</div><div style={{fontSize:11,color:"#555"}}>unit tersisa</div></Card>
+              <Card><div style={{fontSize:10,color:"#fbbf24",fontWeight:700,letterSpacing:1,marginBottom:6}}>TOTAL OMZET</div><div style={{fontSize:20,fontWeight:800,color:"#fbbf24"}}>{fmtK(u.sales*HARGA_JUAL)}</div><div style={{fontSize:11,color:"#555"}}>{fmt(u.sales*HARGA_JUAL)}</div></Card>
+            </div>
+            <SecTitle>Rincian Finansial</SecTitle>
+            <Card style={{marginBottom:16}}>
+              <InfoRow label="Total Omzet" value={fmt(u.sales*HARGA_JUAL)} color="#e0e0e0"/>
+              <InfoRow label="Total Setoran ke Admin" value={fmt(u.setoran||0)} color="#ef4444"/>
+              <InfoRow label="Total Profit User" value={fmt(u.sales*PROFIT_PER_PRODUK)} color="#4ade80"/>
+              <InfoRow label="Sudah Withdraw" value={fmt(u.withdrawn||0)} color="#c084fc"/>
+              <InfoRow label="Saldo Wallet" value={fmt(u.wallet||0)} color="#c084fc" border={false}/>
+            </Card>
+            {/* Monthly target for this user */}
+            {card&&<><SecTitle>🎯 Progress Target Bulan Ini</SecTitle>
+              <Card style={{marginBottom:16,border:`1px solid ${card.color}30`}}>
+                <div style={{display:"flex",justifyContent:"space-between",marginBottom:8}}>
+                  <span style={{fontSize:13,color:"#888"}}>{card.name} · Target {card.target}/bulan</span>
+                  <span style={{fontSize:13,fontWeight:700,color:card.color}}>{u.monthlySales||0}/{card.target}</span>
+                </div>
+                <ProgressBar pct={Math.round(((u.monthlySales||0)/card.target)*100)} color={card.color}/>
+              </Card>
+            </>}
+            <SecTitle>Riwayat Sales</SecTitle>
+            {(u.salesHistory||[]).length===0
+              ?<Card><div style={{textAlign:"center",color:"#444",fontSize:13,padding:"10px 0"}}>Belum ada riwayat</div></Card>
+              :<Card>{(u.salesHistory||[]).slice().reverse().slice(0,10).map((s,i)=>(
+                <div key={i} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 0",borderBottom:"1px solid rgba(255,255,255,0.05)"}}>
+                  <div><div style={{fontSize:13,fontWeight:600}}>{s.qty} unit terjual</div><div style={{fontSize:11,color:"#555"}}>{s.date}</div></div>
+                  <div style={{textAlign:"right"}}>
+                    <div style={{fontSize:12,color:"#4ade80",fontWeight:700}}>+{fmt(s.profit)}</div>
+                    <LBPDisplay amount={"+"+s.lbp} size={12} fontSize={11} color="#ffd700"/>
+                  </div>
+                </div>
+              ))}</Card>}
+            <div style={{height:12}}/>
+            <SecTitle>Permintaan Stok</SecTitle>
+            {(u.stockRequests||[]).length===0
+              ?<Card><div style={{textAlign:"center",color:"#444",fontSize:13,padding:"10px 0"}}>Belum ada permintaan stok</div></Card>
+              :<>
+                {(u.stockRequests||[]).filter(r=>r.status==="Menunggu").length>1&&(
+                  <Btn variant="success" small style={{marginBottom:10}} onClick={()=>{
+                    const newReqs=(u.stockRequests||[]).map(r=>r.status==="Menunggu"?{...r,status:"Selesai"}:r);
+                    const totalQty=u.stockRequests.filter(r=>r.status==="Menunggu").reduce((s,r)=>s+r.qty,0);
+                    updateUser(u.id,{stock:(u.stock||0)+totalQty,stockRequests:newReqs});
+                    showToast("s",`Semua stok disetujui! +${totalQty} unit`);
+                  }}>✓ Approve Semua yang Menunggu</Btn>
+                )}
+                <Card>{(u.stockRequests||[]).slice().reverse().map((r2,i)=>(
+                  <div key={i} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 0",borderBottom:"1px solid rgba(255,255,255,0.05)"}}>
+                    <div><div style={{fontSize:13,fontWeight:600}}>+{r2.qty} unit</div><div style={{fontSize:11,color:"#555"}}>{r2.date}</div></div>
+                    <div style={{display:"flex",gap:8,alignItems:"center"}}>
+                      <span style={{fontSize:11,fontWeight:700,color:r2.status==="Menunggu"?"#ffd700":"#4ade80",background:r2.status==="Menunggu"?"rgba(255,215,0,0.1)":"rgba(74,222,128,0.1)",border:`1px solid ${r2.status==="Menunggu"?"rgba(255,215,0,0.3)":"rgba(74,222,128,0.3)"}`,borderRadius:20,padding:"3px 10px"}}>{r2.status}</span>
+                      {r2.status==="Menunggu"&&<button onClick={()=>{
+                        const idx=u.stockRequests.length-1-i;
+                        const newReqs=[...(u.stockRequests||[])]; newReqs[idx]={...newReqs[idx],status:"Selesai"};
+                        updateUser(u.id,{stock:(u.stock||0)+r2.qty,stockRequests:newReqs});
+                        showToast("s",`Stok +${r2.qty} unit untuk ${u.username} disetujui!`);
+                      }} style={{background:"rgba(74,222,128,0.12)",border:"1px solid rgba(74,222,128,0.3)",borderRadius:8,padding:"5px 12px",color:"#4ade80",fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:ff}}>✓ Setujui</button>}
+                    </div>
+                  </div>
+                ))}</Card>
+              </>
+            }
+            <div style={{height:16}}/>
+          </div>
+        </div>
+      );
+
+      if(panel==="wallet") return (
+        <div style={pageStyle}>
+          <Toast msg={toast}/>
+          <BackHeader title={`Wallet — ${u.username}`} sub="Admin · Keuangan User" accent="#c084fc" onBack={()=>setAdminSub(null)}/>
+          <div style={{padding:"20px 16px"}}>
+            <Card style={{marginBottom:12,background:"linear-gradient(135deg,rgba(147,51,234,0.15),transparent)",border:"1px solid rgba(147,51,234,0.3)"}}>
+              <div style={{fontSize:11,color:"#888",fontWeight:700,letterSpacing:1,textTransform:"uppercase",marginBottom:8}}>Saldo Wallet</div>
+              <div style={{fontSize:36,fontWeight:800,color:"#c084fc"}}>{fmtK(u.wallet||0)}</div>
+              <div style={{fontSize:12,color:"#666",marginTop:4}}>{fmt(u.wallet||0)}</div>
+            </Card>
+            <SecTitle>Detail Keuangan</SecTitle>
+            <Card style={{marginBottom:16}}>
+              <InfoRow label="Total Omzet" value={fmt(u.sales*HARGA_JUAL)} color="#e0e0e0"/>
+              <InfoRow label="Total Setoran Diterima" value={fmt(u.setoran||0)} color="#ef4444"/>
+              <InfoRow label="Total Profit User" value={fmt(u.sales*PROFIT_PER_PRODUK)} color="#4ade80"/>
+              <InfoRow label="Sudah Withdraw" value={fmt(u.withdrawn||0)} color="#a78bfa"/>
+              <InfoRow label="Saldo Saat Ini" value={fmt(u.wallet||0)} color="#c084fc" border={false}/>
+            </Card>
+            <SecTitle>Tambah / Kurangi Saldo</SecTitle>
+            <Card style={{marginBottom:16}}>
+              <div style={{display:"flex",gap:10,marginBottom:12}}>
+                <input type="number" inputMode="numeric" placeholder="Nominal (Rp)"
+                  value={lbpEdit[`w_${u.id}`]||""} onChange={e=>setLbpEdit(p=>({...p,[`w_${u.id}`]:e.target.value}))}
+                  style={{flex:1,background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:10,padding:"12px 14px",color:"#e0e0e0",fontSize:16,outline:"none",fontFamily:ff,WebkitAppearance:"none"}}/>
+              </div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+                <Btn variant="success" small onClick={()=>{
+                  const v=parseInt(lbpEdit[`w_${u.id}`])||0;
+                  if(v>0){updateUser(u.id,{wallet:(u.wallet||0)+v}); showToast("s",`+${fmt(v)} ke wallet ${u.username}`); setLbpEdit(p=>({...p,[`w_${u.id}`]:""}));}
+                }}>+ Tambah</Btn>
+                <Btn variant="danger" small onClick={()=>{
+                  const v=parseInt(lbpEdit[`w_${u.id}`])||0;
+                  if(v>0&&v<=(u.wallet||0)){updateUser(u.id,{wallet:(u.wallet||0)-v}); showToast("s",`–${fmt(v)} dari wallet ${u.username}`); setLbpEdit(p=>({...p,[`w_${u.id}`]:""}));}
+                  else showToast("e","Nominal melebihi saldo!");
+                }}>– Kurangi</Btn>
+              </div>
+            </Card>
+          </div>
+        </div>
+      );
+
+      if(panel==="lbp") return (
+        <div style={pageStyle}>
+          <Toast msg={toast}/>
+          <BackHeader title={`LBP — ${u.username}`} sub="Admin · LustBurnPoints" accent="#ffd700" onBack={()=>setAdminSub(null)}/>
+          <div style={{padding:"20px 16px"}}>
+            <Card style={{marginBottom:12,background:"linear-gradient(135deg,rgba(255,215,0,0.12),transparent)",border:"1px solid rgba(255,215,0,0.3)"}}>
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+                <div>
+                  <div style={{fontSize:11,color:"#888",fontWeight:700,letterSpacing:1,textTransform:"uppercase",marginBottom:8,display:"flex",alignItems:"center",gap:5}}><LBPCoin size={14}/>LBP Balance</div>
+                  <LBPDisplay amount={u.lbp} size={26} fontSize={36}/>
+                  <div style={{fontSize:12,color:"#666",marginTop:4}}>≈ {fmt(u.lbp*LBP_TO_IDR)}</div>
+                </div>
+                <div style={{textAlign:"right"}}>
+                  <div style={{fontSize:28}}>{r.label.split(" ")[0]}</div>
+                  <Badge c={r.color}>{r.label}</Badge>
+                  <div style={{fontSize:11,color:"#555",marginTop:6}}>#{sorted.findIndex(x=>x.id===u.id)+1} leaderboard</div>
+                </div>
+              </div>
+            </Card>
+            <SecTitle>Member Card</SecTitle>
+            {card
+              ?<Card style={{marginBottom:16,background:`${card.color}10`,border:`1px solid ${card.color}30`}}>
+                <div style={{display:"flex",alignItems:"center",gap:14}}>
+                  <div style={{fontSize:36}}>{card.icon}</div>
+                  <div>
+                    <div style={{fontSize:16,fontWeight:800,color:card.color}}>{card.name}</div>
+                    <div style={{fontSize:12,color:"#777",marginTop:4,display:"flex",alignItems:"center",gap:3}}>+{card.lbpBonus} <LBPCoin size={12}/> bonus/produk · Total {LBP_BASE_PER_SALE+card.lbpBonus} <LBPCoin size={12}/>/produk</div>
+                  </div>
+                </div>
+              </Card>
+              :<Card style={{marginBottom:16}}><div style={{fontSize:13,color:"#555",textAlign:"center",padding:"8px 0"}}>Belum punya member card</div></Card>
+            }
+            <SecTitle>Atur LBP Admin</SecTitle>
+            <Card style={{marginBottom:16}}>
+              <div style={{display:"flex",gap:10,marginBottom:12}}>
+                <input type="number" inputMode="numeric" placeholder="Jumlah LBP"
+                  value={lbpEdit[u.id]||""} onChange={e=>setLbpEdit(p=>({...p,[u.id]:e.target.value}))}
+                  style={{flex:1,background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:10,padding:"12px 14px",color:"#e0e0e0",fontSize:16,outline:"none",fontFamily:ff,WebkitAppearance:"none"}}/>
+              </div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+                <Btn variant="warn" small onClick={()=>{
+                  const v=parseInt(lbpEdit[u.id])||0;
+                  if(v>0){
+                    const today=new Date().toLocaleDateString("id-ID");
+                    const newH=[...(u.lbpHistory||[]),{type:"earn",amount:v,desc:"Bonus admin",date:today}];
+                    updateUser(u.id,{lbp:u.lbp+v,lbpHistory:newH}); showToast("s",`+${v} LBP ke ${u.username}`); setLbpEdit(p=>({...p,[u.id]:""}));
+                  }
+                }}>+ Tambah LBP</Btn>
+                <Btn variant="ghost" small onClick={()=>{
+                  const v=parseInt(lbpEdit[u.id])||0;
+                  if(v>0){updateUser(u.id,{lbp:Math.max(0,u.lbp-v)}); showToast("s",`–${v} LBP dari ${u.username}`); setLbpEdit(p=>({...p,[u.id]:""}));}
+                }}>– Kurangi LBP</Btn>
+              </div>
+              <div style={{marginTop:12}}>
+                <Btn small onClick={()=>{
+                  const v=parseInt(lbpEdit[u.id]);
+                  if(!isNaN(v)&&v>=0){updateUser(u.id,{lbp:v}); showToast("s",`LBP ${u.username} di-set ke ${v}`); setLbpEdit(p=>({...p,[u.id]:""}));}
+                }}>Set Langsung ke Nilai</Btn>
+              </div>
+            </Card>
+            {/* LBP History */}
+            <SecTitle>Riwayat LBP</SecTitle>
+            {(u.lbpHistory||[]).length===0
+              ?<Card><div style={{textAlign:"center",color:"#444",fontSize:13,padding:"10px 0"}}>Belum ada riwayat</div></Card>
+              :<Card>{(u.lbpHistory||[]).slice().reverse().slice(0,8).map((h,i)=>(
+                <div key={i} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"9px 0",borderBottom:"1px solid rgba(255,255,255,0.05)"}}>
+                  <div><div style={{fontSize:12,fontWeight:600,color:"#ddd"}}>{h.desc}</div><div style={{fontSize:10,color:"#555"}}>{h.date}</div></div>
+                  <LBPDisplay amount={(h.type==="earn"||h.type==="referral"?"+":"-")+h.amount} size={12} fontSize={12} color={h.type==="earn"||h.type==="referral"?"#4ade80":"#ef4444"}/>
+                </div>
+              ))}</Card>}
+          </div>
+        </div>
+      );
+    }
+
+    // ── Admin main pages ────────────────────────────────────────────────────
+    return (
+      <div style={pageStyle}>
+        <Toast msg={toast}/>
+        <div style={{background:"linear-gradient(135deg,#1a0533,#07070f)",padding:"48px 20px 20px",marginBottom:4}}>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+            <div>
+              <div style={{fontSize:11,color:"#9333ea",letterSpacing:2,fontWeight:700,textTransform:"uppercase"}}>◈ Admin Panel</div>
+              <div style={{fontSize:24,fontWeight:800,color:"#e0e0e0",marginTop:2}}>Northgate</div>
+            </div>
+            <button onClick={logout} style={{background:"rgba(239,68,68,0.12)",border:"1px solid rgba(239,68,68,0.3)",borderRadius:10,padding:"8px 14px",color:"#ef4444",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:ff}}>Logout</button>
+          </div>
+        </div>
+        <div style={{padding:"0 16px"}}>
+
+          {/* ── OVERVIEW ── */}
+          {activeNav==="home"&&<>
+            <div style={{height:16}}/>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:16}}>
+              <Card><div style={{fontSize:10,color:"#c084fc",fontWeight:700,letterSpacing:1,marginBottom:6}}>👥 TOTAL USERS</div><div style={{fontSize:28,fontWeight:800,color:"#c084fc"}}>{nonAdmin.length}</div></Card>
+              <Card><div style={{fontSize:10,color:"#ffd700",fontWeight:700,letterSpacing:1,marginBottom:6}}>🛒 TOTAL SALES</div><div style={{fontSize:28,fontWeight:800,color:"#ffd700"}}>{totalSales}</div><div style={{fontSize:11,color:"#555"}}>unit all time</div></Card>
+              <Card><div style={{fontSize:10,color:"#ef4444",fontWeight:700,letterSpacing:1,marginBottom:6}}>💸 TOTAL SETORAN</div><div style={{fontSize:20,fontWeight:800,color:"#ef4444"}}>{fmtK(totalSetoran)}</div><div style={{fontSize:11,color:"#555"}}>{fmt(totalSetoran)}</div></Card>
+              <Card><div style={{fontSize:10,color:"#4ade80",fontWeight:700,letterSpacing:1,marginBottom:6}}>📈 TOTAL OMZET</div><div style={{fontSize:20,fontWeight:800,color:"#4ade80"}}>{fmtK(totalSales*HARGA_JUAL)}</div><div style={{fontSize:11,color:"#555"}}>{fmt(totalSales*HARGA_JUAL)}</div></Card>
+            </div>
+            <div style={{display:"flex",justifyContent:"flex-end",marginBottom:12}}>
+              <button onClick={()=>{
+                const rows=[["Username","Sales","Stok","LBP","Wallet","Setoran","Member Card","Bergabung"],...nonAdmin.map(u=>[u.username,u.sales,u.stock,u.lbp,u.wallet||0,u.setoran||0,u.memberCard||"-",u.joinDate])];
+                exportCSV(rows,`northgate-report-${new Date().toISOString().split("T")[0]}.csv`);
+                showToast("s","CSV berhasil diexport!");
+              }} style={{background:"rgba(34,197,94,0.12)",border:"1px solid rgba(34,197,94,0.3)",borderRadius:10,padding:"8px 16px",color:"#4ade80",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:ff,display:"flex",alignItems:"center",gap:6}}>
+                📊 Export CSV
+              </button>
+            </div>
+            <SecTitle>Ringkasan Per User</SecTitle>
+            {sorted.map(u=>{const r=getRank(u.lbp); return (
+              <Card key={u.id} style={{marginBottom:10}}>
+                <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:12}}>
+                  <div style={{width:42,height:42,borderRadius:"50%",background:`linear-gradient(135deg,${r.color},#07070f)`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:17,fontWeight:800,border:`2px solid ${r.color}40`,flexShrink:0}}>{u.username[0]}</div>
+                  <div style={{flex:1}}>
+                    <div style={{fontWeight:700,fontSize:15}}>{u.username}</div>
+                    <Badge c={r.color} sm>{r.label}</Badge>
+                  </div>
+                  <div style={{textAlign:"right"}}><LBPDisplay amount={u.lbp} size={16} fontSize={16}/></div>
+                </div>
+                <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8,borderTop:"1px solid rgba(255,255,255,0.05)",paddingTop:12}}>
+                  {[{l:"Sales",v:u.sales,c:"#4ade80"},{l:"Stok",v:u.stock,c:"#60efff"},{l:"Setoran",v:fmtK(u.setoran||0),c:"#ef4444"}].map(x=>(
+                    <div key={x.l} style={{textAlign:"center"}}>
+                      <div style={{fontSize:10,color:"#555"}}>{x.l}</div>
+                      <div style={{fontSize:14,fontWeight:700,color:x.c,marginTop:2}}>{x.v}</div>
+                    </div>
+                  ))}
+                </div>
+                <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8,marginTop:12}}>
+                  {[{l:"📈 Penjualan",p:"sales"},{l:"💰 Wallet",p:"wallet"},{l:"✨ LBP",p:"lbp"}].map(x=>(
+                    <button key={x.p} onClick={()=>setAdminSub({panel:x.p,userId:u.id})}
+                      style={{background:"rgba(147,51,234,0.1)",border:"1px solid rgba(147,51,234,0.25)",borderRadius:10,padding:"8px 6px",color:"#c084fc",fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:ff}}>{x.l}</button>
+                  ))}
+                </div>
+              </Card>
+            );})}
+          </>}
+
+          {/* ── USERS ── */}
+          {activeNav==="users"&&<>
+            <div style={{height:16}}/>
+            <div style={{display:"flex",justifyContent:"flex-end",marginBottom:12}}>
+              <button onClick={()=>{
+                const rows=[["Username","Password","LBP","Sales","Stok","Wallet","Setoran","Member Card","Kode Referral","Referrals","Bergabung"],...nonAdmin.map(u=>[u.username,u.password,u.lbp,u.sales,u.stock,u.wallet||0,u.setoran||0,u.memberCard||"-",u.referralCode||"-",(u.referrals||[]).length,u.joinDate])];
+                exportCSV(rows,`northgate-users-${new Date().toISOString().split("T")[0]}.csv`);
+                showToast("s","Data user diexport!");
+              }} style={{background:"rgba(34,197,94,0.12)",border:"1px solid rgba(34,197,94,0.3)",borderRadius:10,padding:"8px 16px",color:"#4ade80",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:ff}}>
+                📊 Export CSV
+              </button>
+            </div>
+            <SecTitle>Daftar User</SecTitle>
+            {sorted.map(u=>{const r=getRank(u.lbp); const card=MEMBER_CARDS.find(c=>c.id===u.memberCard); return (
+              <Card key={u.id} style={{marginBottom:12}}>
+                <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:14}}>
+                  <div style={{width:46,height:46,borderRadius:"50%",background:`linear-gradient(135deg,${r.color},#07070f)`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,fontWeight:800,border:`2px solid ${r.color}40`,flexShrink:0}}>{u.username[0]}</div>
+                  <div style={{flex:1}}>
+                    <div style={{fontWeight:700,fontSize:16}}>{u.username}</div>
+                    <div style={{fontSize:11,color:"#555",marginTop:2}}>Bergabung {u.joinDate}</div>
+                  </div>
+                  <Badge c={r.color}>{r.label}</Badge>
+                </div>
+                <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:6,marginBottom:14}}>
+                  {[{l:"LBP",v:u.lbp,c:"#ffd700",coin:true},{l:"Sales",v:u.sales,c:"#4ade80"},{l:"Stok",v:u.stock,c:"#60efff"},{l:"Wallet",v:fmtK(u.wallet||0),c:"#c084fc"}].map(x=>(
+                    <div key={x.l} style={{background:"rgba(255,255,255,0.03)",borderRadius:10,padding:"8px 6px",textAlign:"center"}}>
+                      <div style={{fontSize:9,color:"#555",letterSpacing:1,marginBottom:3,display:"flex",alignItems:"center",justifyContent:"center",gap:2}}>{x.coin&&<LBPCoin size={9}/>}{x.l}</div>
+                      <div style={{fontSize:13,fontWeight:700,color:x.c}}>{x.v}</div>
+                    </div>
+                  ))}
+                </div>
+                {card&&<div style={{background:`${card.color}10`,border:`1px solid ${card.color}25`,borderRadius:10,padding:"8px 12px",marginBottom:12,display:"flex",alignItems:"center",gap:8}}>
+                  <span style={{fontSize:16}}>{card.icon}</span>
+                  <div style={{fontSize:12,color:card.color,fontWeight:700}}>{card.name}</div>
+                  <div style={{fontSize:11,color:"#666",marginLeft:"auto",display:"flex",alignItems:"center",gap:3}}>+{card.lbpBonus} <LBPCoin size={11}/>/produk</div>
+                </div>}
+                {(u.referrals||[]).length>0&&<div style={{background:"rgba(34,197,94,0.08)",border:"1px solid rgba(34,197,94,0.2)",borderRadius:10,padding:"7px 12px",marginBottom:12,fontSize:11,color:"#4ade80"}}>
+                  👥 {(u.referrals||[]).length} referral · Kode: <span style={{fontWeight:700,letterSpacing:1}}>{u.referralCode}</span>
+                </div>}
+                <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8}}>
+                  {[{l:"📈 Penjualan",p:"sales"},{l:"💰 Wallet",p:"wallet"},{l:"✨ LBP",p:"lbp"}].map(x=>(
+                    <button key={x.p} onClick={()=>setAdminSub({panel:x.p,userId:u.id})}
+                      style={{background:"rgba(147,51,234,0.1)",border:"1px solid rgba(147,51,234,0.25)",borderRadius:10,padding:"9px 6px",color:"#c084fc",fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:ff}}>{x.l}</button>
+                  ))}
+                </div>
+              </Card>
+            );})}
+          </>}
+
+          {/* ── FINANCE ── */}
+          {activeNav==="finance"&&<>
+            <div style={{height:16}}/>
+            <SecTitle>Ringkasan Keuangan</SecTitle>
+            <Card style={{marginBottom:12,background:"linear-gradient(135deg,rgba(239,68,68,0.1),transparent)",border:"1px solid rgba(239,68,68,0.25)"}}>
+              <div style={{fontSize:11,color:"#ef4444",fontWeight:700,letterSpacing:1,textTransform:"uppercase",marginBottom:8}}>Total Setoran Masuk</div>
+              <div style={{fontSize:32,fontWeight:800,color:"#ef4444"}}>{fmtK(totalSetoran)}</div>
+              <div style={{fontSize:12,color:"#666",marginTop:4}}>{fmt(totalSetoran)}</div>
+            </Card>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:16}}>
+              <Card><div style={{fontSize:10,color:"#ffd700",fontWeight:700,letterSpacing:1,marginBottom:6}}>TOTAL OMZET</div><div style={{fontSize:20,fontWeight:800,color:"#ffd700"}}>{fmtK(totalSales*HARGA_JUAL)}</div></Card>
+              <Card><div style={{fontSize:10,color:"#4ade80",fontWeight:700,letterSpacing:1,marginBottom:6}}>TOTAL PROFIT USER</div><div style={{fontSize:20,fontWeight:800,color:"#4ade80"}}>{fmtK(totalSales*PROFIT_PER_PRODUK)}</div></Card>
+            </div>
+            <div style={{display:"flex",justifyContent:"flex-end",marginBottom:12}}>
+              <button onClick={()=>{
+                const rows=[["Username","Sales","Omzet","Setoran","Profit","Withdraw","Saldo Wallet"],...nonAdmin.map(u=>[u.username,u.sales,u.sales*HARGA_JUAL,u.setoran||0,u.sales*PROFIT_PER_PRODUK,u.withdrawn||0,u.wallet||0]),["TOTAL",totalSales,totalSales*HARGA_JUAL,totalSetoran,totalSales*PROFIT_PER_PRODUK,"",""]];
+                exportCSV(rows,`northgate-finance-${new Date().toISOString().split("T")[0]}.csv`);
+                showToast("s","Laporan keuangan diexport!");
+              }} style={{background:"rgba(34,197,94,0.12)",border:"1px solid rgba(34,197,94,0.3)",borderRadius:10,padding:"8px 16px",color:"#4ade80",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:ff}}>
+                📊 Export Laporan CSV
+              </button>
+            </div>
+            <SecTitle>Struktur Harga (Fixed)</SecTitle>
+            <Card style={{marginBottom:16}}>
+              <InfoRow label="💵 Harga Jual ke Customer" value={fmt(HARGA_JUAL)} color="#e0e0e0"/>
+              <InfoRow label="⬆ Setoran ke Admin" value={fmt(SETORAN_PER_PRODUK)} color="#ef4444"/>
+              <InfoRow label="✅ Profit Bersih User" value={fmt(PROFIT_PER_PRODUK)} color="#4ade80"/>
+              <InfoRow label={<span style={{display:"flex",alignItems:"center",gap:4}}><LBPCoin size={13}/>LBP Base/produk</span>} value={`${LBP_BASE_PER_SALE} LBP`} color="#ffd700"/>
+              <InfoRow label={<span style={{display:"flex",alignItems:"center",gap:4}}><LBPCoin size={13}/>Kurs LBP</span>} value={`1 LBP = ${fmt(LBP_TO_IDR)}`} color="#ffd700" border={false}/>
+            </Card>
+            <SecTitle>Setoran Per User</SecTitle>
+            {sorted.map(u=>{const r=getRank(u.lbp); return (
+              <Card key={u.id} style={{marginBottom:10,display:"flex",alignItems:"center",gap:14}} onClick={()=>setAdminSub({panel:"wallet",userId:u.id})}>
+                <div style={{width:40,height:40,borderRadius:"50%",background:`linear-gradient(135deg,${r.color},#07070f)`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,fontWeight:800,border:`2px solid ${r.color}40`,flexShrink:0}}>{u.username[0]}</div>
+                <div style={{flex:1}}>
+                  <div style={{fontWeight:700,fontSize:14}}>{u.username}</div>
+                  <div style={{fontSize:11,color:"#555",marginTop:2}}>{u.sales} produk · {fmt(u.sales*HARGA_JUAL)} omzet</div>
+                </div>
+                <div style={{textAlign:"right"}}>
+                  <div style={{fontWeight:800,fontSize:15,color:"#ef4444"}}>{fmtK(u.setoran||0)}</div>
+                  <div style={{fontSize:10,color:"#555"}}>setoran</div>
+                </div>
+              </Card>
+            );})}
+          </>}
+
+          {/* ── SETTING ── */}
+          {activeNav==="setting"&&<>
+            <div style={{height:16}}/>
+            <SecTitle>Bonus Signup</SecTitle>
+            <Card style={{marginBottom:16}}>
+              <div style={{fontWeight:700,fontSize:14,color:"#ccc",marginBottom:4}}>LBP Bonus User Baru</div>
+              <div style={{fontSize:12,color:"#555",marginBottom:12}}>Saat ini: {settings.newUserBonus} LBP = {fmt(settings.newUserBonus*LBP_TO_IDR)}</div>
+              <div style={{display:"flex",gap:10,alignItems:"center",marginBottom:14}}>
+                <input type="number" value={settings.newUserBonus} onChange={e=>setSettings(p=>({...p,newUserBonus:parseInt(e.target.value)||0}))}
+                  style={{flex:1,background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:10,padding:"12px 14px",color:"#e0e0e0",fontSize:16,outline:"none",fontFamily:ff,WebkitAppearance:"none"}}/>
+                <span style={{fontSize:12,color:"#666",whiteSpace:"nowrap"}}>{fmt((settings.newUserBonus||0)*LBP_TO_IDR)}</span>
+              </div>
+              <Btn onClick={()=>{DB.settings=settings; showToast("s","Setting tersimpan!");}}>Simpan</Btn>
+            </Card>
+            <SecTitle>Tier Peringkat & LBP</SecTitle>
+            <Card style={{marginBottom:16}}>
+              {[{l:"👑 Master",r:"2500+ LBP",v:fmt(2500*LBP_TO_IDR),c:"#ff6bff"},{l:"💎 Diamond",r:"1000–2499 LBP",v:fmt(1000*LBP_TO_IDR),c:"#60efff"},{l:"🥇 Gold",r:"500–999 LBP",v:fmt(500*LBP_TO_IDR),c:"#ffd700"},{l:"🥈 Silver",r:"250–499 LBP",v:fmt(250*LBP_TO_IDR),c:"#c0c0c0"},{l:"🥉 Bronze",r:"100–249 LBP",v:fmt(100*LBP_TO_IDR),c:"#cd7f32"},{l:"🌱 Starter",r:"0–99 LBP",v:"—",c:"#7fff7f"}].map((t,i,arr)=>(
+                <div key={t.l} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"11px 0",borderBottom:i<arr.length-1?"1px solid rgba(255,255,255,0.05)":"none"}}>
+                  <Badge c={t.c}>{t.l}</Badge>
+                  <div style={{textAlign:"right"}}>
+                    <div style={{fontSize:11,color:"#555"}}>{t.r}</div>
+                    <div style={{fontSize:11,color:t.c,fontWeight:700}}>{t.v}</div>
+                  </div>
+                </div>
+              ))}
+            </Card>
+            <SecTitle>Member Card — Bonus LBP</SecTitle>
+            <Card>
+              {MEMBER_CARDS.map((c,i)=>(
+                <div key={c.id} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"11px 0",borderBottom:i<MEMBER_CARDS.length-1?"1px solid rgba(255,255,255,0.05)":"none"}}>
+                  <div style={{display:"flex",alignItems:"center",gap:10}}>
+                    <span style={{fontSize:20}}>{c.icon}</span>
+                    <div>
+                      <div style={{fontSize:13,fontWeight:700,color:c.color}}>{c.name}</div>
+                      <div style={{fontSize:11,color:"#555",display:"flex",alignItems:"center",gap:3}}><LBPDisplay amount={c.price} size={11} fontSize={11}/> = {fmt(c.price*LBP_TO_IDR)}</div>
+                    </div>
+                  </div>
+                  <div style={{textAlign:"right"}}>
+                    <div style={{fontSize:13,fontWeight:700,color:"#ffd700",display:"flex",alignItems:"center",justifyContent:"flex-end",gap:4}}><LBPCoin size={13}/>{LBP_BASE_PER_SALE+c.lbpBonus} LBP</div>
+                    <div style={{fontSize:10,color:"#555"}}>per produk</div>
+                  </div>
+                </div>
+              ))}
+            </Card>
+          </>}
+        </div>
+        <BottomNav items={adminNav} active={activeNav} onNav={setActiveNav}/>
+      </div>
+    );
+  }
+
+  // ════════════════════════════════════════════════════════════════════════════
+  //  USER DASHBOARD
+  // ════════════════════════════════════════════════════════════════════════════
+  if(screen==="userDash") {
+    const rank    = getRank(currentUser.lbp);
+    const myPos   = sorted.findIndex(u=>u.id===currentUser.id)+1;
+    const myCard  = MEMBER_CARDS.find(c=>c.id===currentUser.memberCard);
+    const walletTotal = currentUser.wallet||0;
+    const userNav = [
+      {id:"home",    icon:"🏠", label:"Home"},
+      {id:"shop",    icon:"🛍️",label:"Shop"},
+      {id:"ranking", icon:"🏆", label:"Ranking"},
+    ];
+
+    // ── Referral panel ─────────────────────────────────────────────────────
+    if(subPanel==="referral") return (
+      <ReferralPanel user={currentUser} myCard={myCard} users={users} onBack={()=>setSubPanel(null)} showToast={showToast}/>
+    );
+
+    // ── LBP History panel ──────────────────────────────────────────────────
+    if(subPanel==="lbpHistory") return (
+      <LBPHistoryPanel history={currentUser.lbpHistory} onBack={()=>setSubPanel(null)}/>
+    );
+
+    // ── Shop Detail ─────────────────────────────────────────────────────────
+    if(shopDetail) {
+      const card=shopDetail;
+      const owned=currentUser.ownedCards?.includes(card.id);
+      const active=currentUser.memberCard===card.id;
+      const canBuy=currentUser.lbp>=card.price;
+      return (
+        <div style={pageStyle}>
+          <Toast msg={toast}/>
+          <div style={{background:`linear-gradient(160deg,${card.color}22,#07070f)`,padding:"48px 20px 24px"}}>
+            <button onClick={()=>setShopDetail(null)} style={{background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:10,padding:"8px 16px",color:"#ccc",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:ff,marginBottom:20}}>← Kembali</button>
+            <div style={{fontSize:56,textAlign:"center",marginBottom:8}}>{card.icon}</div>
+            <div style={{fontSize:26,fontWeight:800,color:card.color,textAlign:"center"}}>{card.name}</div>
+            <div style={{textAlign:"center",marginTop:8}}><LBPDisplay amount={card.price} size={22} fontSize={24}/></div>
+            <div style={{textAlign:"center",marginTop:4,fontSize:12,color:"#555"}}>= {fmt(card.price*LBP_TO_IDR)}</div>
+          </div>
+          <div style={{padding:"20px 16px"}}>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:20}}>
+              <Card><div style={{fontSize:11,color:"#666",marginBottom:6,fontWeight:600,display:"flex",alignItems:"center",gap:4}}><LBPCoin size={12}/>LBP Base</div><LBPDisplay amount={LBP_BASE_PER_SALE} size={16} fontSize={20}/><div style={{fontSize:10,color:"#555"}}>per produk</div></Card>
+              <Card style={{background:`${card.color}10`,border:`1px solid ${card.color}30`}}><div style={{fontSize:11,color:card.color,marginBottom:6,fontWeight:600,display:"flex",alignItems:"center",gap:4}}><LBPCoin size={12}/>🎁 Bonus</div><div style={{fontSize:20,fontWeight:800,color:card.color}}>+{card.lbpBonus} <LBPCoin size={16}/></div><div style={{fontSize:10,color:"#555"}}>per produk</div></Card>
+              <Card style={{gridColumn:"1/-1",background:"linear-gradient(135deg,rgba(255,215,0,0.1),transparent)",border:"1px solid rgba(255,215,0,0.3)"}}><div style={{fontSize:11,color:"#ffd700",marginBottom:6,fontWeight:600,display:"flex",alignItems:"center",gap:4}}><LBPCoin size={12}/>⚡ TOTAL LBP PER PRODUK</div><div style={{fontSize:26,fontWeight:800,color:"#ffd700",display:"flex",alignItems:"center",gap:8}}><LBPDisplay amount={LBP_BASE_PER_SALE+card.lbpBonus} size={22} fontSize={26}/><span style={{fontSize:13,color:"#888"}}>= {fmt((LBP_BASE_PER_SALE+card.lbpBonus)*LBP_TO_IDR)}/produk</span></div></Card>
+              <Card><div style={{fontSize:11,color:"#666",marginBottom:6,fontWeight:600}}>🎯 Target/Bulan</div><div style={{fontSize:20,fontWeight:800,color:card.color}}>{card.target}×</div></Card>
+              <Card><div style={{fontSize:11,color:"#666",marginBottom:6,fontWeight:600}}>👥 Referral Bonus</div><div style={{fontSize:16,fontWeight:800,color:"#4ade80"}}>+{REFERRAL_LBP_BONUS+Math.round(REFERRAL_LBP_BONUS*card.referralPct/100)} <LBPCoin size={14}/></div><div style={{fontSize:10,color:"#555"}}>per teman</div></Card>
+            </div>
+            <SecTitle>Fasilitas</SecTitle>
+            <Card style={{marginBottom:24}}>
+              {card.perks.map((p,i)=>(
+                <div key={i} style={{display:"flex",gap:10,padding:"10px 0",borderBottom:i<card.perks.length-1?"1px solid rgba(255,255,255,0.05)":"none"}}>
+                  <span style={{color:card.color,fontWeight:700,flexShrink:0}}>✓</span>
+                  <span style={{fontSize:14,color:"#bbb"}}>{p}</span>
+                </div>
+              ))}
+            </Card>
+            {active?<div style={{textAlign:"center",padding:16,background:`${card.color}15`,border:`1px solid ${card.color}35`,borderRadius:14,fontSize:15,color:card.color,fontWeight:700}}>✓ Kartu Sedang Aktif</div>
+            :owned?<Btn onClick={()=>{updateUser(currentUser.id,{memberCard:card.id}); showToast("s",`${card.icon} ${card.name} diaktifkan!`); setShopDetail(null);}}>Aktifkan Kartu</Btn>
+            :<Btn onClick={()=>canBuy&&buyCard(card)} disabled={!canBuy} style={{background:canBuy?`linear-gradient(135deg,${card.color}cc,${card.color})`:undefined}}>{canBuy?`Beli — ${card.price} LBP`:`Kurang ${card.price-currentUser.lbp} LBP lagi`}</Btn>}
+            <div style={{height:32}}/>
+          </div>
+        </div>
+      );
+    }
+
+    // ── Sub-panel: Penjualan ───────────────────────────────────────────────
+    if(subPanel==="sales") return (
+      <div style={pageStyle}>
+        <Toast msg={toast}/>
+        <BackHeader title="Panel Penjualan" sub="Laporan Harian" accent="#4ade80" onBack={()=>setSubPanel(null)}/>
+        <div style={{padding:"20px 16px"}}>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:16}}>
+            <Card><div style={{fontSize:10,color:"#60efff",fontWeight:700,letterSpacing:1,marginBottom:6}}>STOK SAAT INI</div><div style={{fontSize:28,fontWeight:800,color:"#60efff"}}>{currentUser.stock}</div><div style={{fontSize:11,color:"#555"}}>unit tersedia</div></Card>
+            <Card><div style={{fontSize:10,color:"#4ade80",fontWeight:700,letterSpacing:1,marginBottom:6}}>TERJUAL HARI INI</div><div style={{fontSize:28,fontWeight:800,color:"#4ade80"}}>{currentUser.soldToday}</div><div style={{fontSize:11,color:"#555"}}>unit</div></Card>
+            <Card><div style={{fontSize:10,color:"#ffd700",fontWeight:700,letterSpacing:1,marginBottom:6}}>TOTAL SALES</div><div style={{fontSize:28,fontWeight:800,color:"#ffd700"}}>{currentUser.sales}</div><div style={{fontSize:11,color:"#555"}}>all time</div></Card>
+            <Card><div style={{fontSize:10,color:"#f97316",fontWeight:700,letterSpacing:1,marginBottom:6}}>OMZET TOTAL</div><div style={{fontSize:18,fontWeight:800,color:"#f97316"}}>{fmtK(currentUser.sales*HARGA_JUAL)}</div></Card>
+          </div>
+          {/* Monthly target */}
+          {myCard&&<MonthlyTarget user={currentUser} myCard={myCard}/>}
+          {myCard&&<div style={{background:`${myCard.color}10`,border:`1px solid ${myCard.color}30`,borderRadius:14,padding:"12px 16px",marginBottom:16,display:"flex",alignItems:"center",gap:10}}>
+            <span style={{fontSize:22}}>{myCard.icon}</span>
+            <div><div style={{fontSize:13,fontWeight:700,color:myCard.color}}>{myCard.name}</div><div style={{fontSize:11,color:"#777",display:"flex",alignItems:"center",gap:3}}>Total {LBP_BASE_PER_SALE+myCard.lbpBonus} <LBPCoin size={11}/>/produk (+{myCard.lbpBonus} bonus)</div></div>
+          </div>}
+          <SecTitle>Form Laporan</SecTitle>
+          <Card style={{marginBottom:16}}>
+            <div style={{background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.07)",borderRadius:12,padding:"12px 14px",marginBottom:16}}>
+              <div style={{fontSize:11,color:"#9333ea",fontWeight:700,letterSpacing:1.5,textTransform:"uppercase",marginBottom:10}}>Perhitungan Per Produk</div>
+              <InfoRow label="Harga jual" value={fmt(HARGA_JUAL)}/>
+              <InfoRow label="Setoran admin (auto)" value={`– ${fmt(SETORAN_PER_PRODUK)}`} color="#ef4444"/>
+              <InfoRow label="Profit bersih" value={fmt(PROFIT_PER_PRODUK)} color="#4ade80"/>
+              <InfoRow label={<span style={{display:"flex",alignItems:"center",gap:4}}><LBPCoin size={13}/>LBP didapat</span>} value={`${LBP_BASE_PER_SALE+(myCard?.lbpBonus||0)} LBP`} color="#ffd700" border={false}/>
+            </div>
+            <Inp label="🛒 Barang Terjual (unit)" type="number" inputMode="numeric" value={formSold} onChange={e=>setFormSold(e.target.value)} placeholder="Contoh: 5"/>
+            {formSold&&parseInt(formSold)>0&&<div style={{background:"rgba(34,197,94,0.08)",border:"1px solid rgba(34,197,94,0.2)",borderRadius:10,padding:"12px 14px",marginBottom:14}}>
+              <InfoRow label="Total harga terjual" value={fmt((parseInt(formSold)||0)*HARGA_JUAL)}/>
+              <InfoRow label="Setoran ke admin" value={`– ${fmt((parseInt(formSold)||0)*SETORAN_PER_PRODUK)}`} color="#ef4444"/>
+              <InfoRow label="Masuk wallet" value={fmt((parseInt(formSold)||0)*PROFIT_PER_PRODUK)} color="#4ade80"/>
+              <InfoRow label={<span style={{display:"flex",alignItems:"center",gap:4}}><LBPCoin size={12}/>LBP didapat</span>} value={`+${(parseInt(formSold)||0)*(LBP_BASE_PER_SALE+(myCard?.lbpBonus||0))} LBP`} color="#ffd700" border={false}/>
+            </div>}
+            <Inp label="📦 Minta Stok Baru (unit, opsional)" type="number" inputMode="numeric" value={formStock} onChange={e=>setFormStock(e.target.value)} placeholder="Contoh: 20"/>
+            <Btn onClick={submitSales}>Kirim Laporan ✓</Btn>
+          </Card>
+          {/* Sales history */}
+          {(currentUser.salesHistory||[]).length>0&&<>
+            <SecTitle>Riwayat Penjualan</SecTitle>
+            <Card style={{marginBottom:16}}>
+              {(currentUser.salesHistory||[]).slice().reverse().slice(0,8).map((s,i)=>(
+                <div key={i} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 0",borderBottom:"1px solid rgba(255,255,255,0.05)"}}>
+                  <div><div style={{fontSize:13,fontWeight:600}}>{s.qty} unit terjual</div><div style={{fontSize:11,color:"#555"}}>{s.date}</div></div>
+                  <div style={{textAlign:"right"}}>
+                    <div style={{fontSize:12,color:"#4ade80",fontWeight:700}}>+{fmt(s.profit)}</div>
+                    <LBPDisplay amount={"+"+s.lbp} size={12} fontSize={11} color="#ffd700"/>
+                  </div>
+                </div>
+              ))}
+            </Card>
+          </>}
+          {(currentUser.stockRequests||[]).length>0&&<>
+            <SecTitle>Riwayat Permintaan Stok</SecTitle>
+            <Card>{(currentUser.stockRequests||[]).slice().reverse().slice(0,5).map((r2,i)=>(
+              <div key={i} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 0",borderBottom:"1px solid rgba(255,255,255,0.05)"}}>
+                <div><div style={{fontSize:13,fontWeight:600}}>+{r2.qty} unit</div><div style={{fontSize:11,color:"#555"}}>{r2.date}</div></div>
+                <span style={{fontSize:11,fontWeight:700,color:r2.status==="Menunggu"?"#ffd700":"#4ade80",background:r2.status==="Menunggu"?"rgba(255,215,0,0.1)":"rgba(74,222,128,0.1)",border:`1px solid ${r2.status==="Menunggu"?"rgba(255,215,0,0.3)":"rgba(74,222,128,0.3)"}`,borderRadius:20,padding:"3px 10px"}}>{r2.status}</span>
+              </div>
+            ))}</Card>
+          </>}
+          <div style={{height:16}}/>
+        </div>
+      </div>
+    );
+
+    // ── Sub-panel: Wallet ──────────────────────────────────────────────────
+    if(subPanel==="wallet") return (
+      <div style={pageStyle}>
+        <Toast msg={toast}/>
+        <BackHeader title="Panel Wallet" sub="Keuangan" accent="#c084fc" onBack={()=>setSubPanel(null)}/>
+        <div style={{padding:"20px 16px"}}>
+          <Card style={{marginBottom:12,background:"linear-gradient(135deg,rgba(147,51,234,0.15),transparent)",border:"1px solid rgba(147,51,234,0.3)"}}>
+            <div style={{fontSize:11,color:"#888",fontWeight:700,letterSpacing:1,textTransform:"uppercase",marginBottom:8}}>Saldo Wallet (Profit Bersih)</div>
+            <div style={{fontSize:36,fontWeight:800,color:"#c084fc"}}>{fmtK(walletTotal)}</div>
+            <div style={{fontSize:12,color:"#666",marginTop:4}}>{fmt(walletTotal)}</div>
+          </Card>
+          <SecTitle>Struktur Keuangan Per Produk</SecTitle>
+          <Card style={{marginBottom:16}}>
+            <InfoRow label="💵 Harga jual ke customer" value={fmt(HARGA_JUAL)}/>
+            <InfoRow label="⬆ Setoran ke admin (auto)" value={`– ${fmt(SETORAN_PER_PRODUK)}`} color="#ef4444"/>
+            <InfoRow label="✅ Profit bersih kamu" value={fmt(PROFIT_PER_PRODUK)} color="#4ade80" border={false}/>
+          </Card>
+          <SecTitle>Riwayat Keuangan</SecTitle>
+          <Card style={{marginBottom:16}}>
+            <InfoRow label="Total Produk Terjual" value={`${currentUser.sales} unit`} color="#60efff"/>
+            <InfoRow label="Total Setoran ke Admin" value={fmt(currentUser.setoran||0)} color="#ef4444"/>
+            <InfoRow label="Total Profit" value={fmt(currentUser.sales*PROFIT_PER_PRODUK)} color="#4ade80"/>
+            <InfoRow label="Sudah Withdraw" value={fmt(currentUser.withdrawn||0)} color="#a78bfa"/>
+            <InfoRow label="Saldo Saat Ini" value={fmt(walletTotal)} color="#c084fc" border={false}/>
+          </Card>
+          <SecTitle>Tarik Saldo</SecTitle>
+          <Card style={{marginBottom:16}}>
+            <Inp label={`Jumlah Withdraw (Maks. ${fmt(walletTotal)})`} type="number" inputMode="numeric" value={formWd} onChange={e=>setFormWd(e.target.value)} placeholder={`Maks ${fmtK(walletTotal)}`}/>
+            {formWd&&parseInt(formWd)>0&&<div style={{background:"rgba(34,197,94,0.08)",border:"1px solid rgba(34,197,94,0.2)",borderRadius:10,padding:"10px 14px",marginBottom:14,fontSize:12,color:"#4ade80"}}>
+              Sisa setelah withdraw: {fmt(walletTotal-(parseInt(formWd)||0))}
+            </div>}
+            <Btn variant="success" onClick={submitWithdraw}>Ajukan Withdraw ↓</Btn>
+          </Card>
+        </div>
+      </div>
+    );
+
+    // ── Sub-panel: LBP ────────────────────────────────────────────────────
+    if(subPanel==="lbp") return (
+      <div style={pageStyle}>
+        <Toast msg={toast}/>
+        <BackHeader title="Panel LBP" sub="LustBurnPoints" accent="#ffd700" onBack={()=>setSubPanel(null)}/>
+        <div style={{padding:"20px 16px"}}>
+          <Card style={{marginBottom:12,background:"linear-gradient(135deg,rgba(255,215,0,0.12),transparent)",border:"1px solid rgba(255,215,0,0.3)"}}>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+              <div>
+                <div style={{fontSize:11,color:"#888",fontWeight:700,letterSpacing:1,textTransform:"uppercase",marginBottom:8,display:"flex",alignItems:"center",gap:5}}><LBPCoin size={14}/>LBP Balance</div>
+                <LBPDisplay amount={currentUser.lbp} size={30} fontSize={40}/>
+                <div style={{fontSize:12,color:"#666",marginTop:4}}>≈ {fmt(currentUser.lbp*LBP_TO_IDR)}</div>
+              </div>
+              <div style={{textAlign:"right"}}>
+                <div style={{fontSize:32}}>{rank.label.split(" ")[0]}</div>
+                <Badge c={rank.color}>{rank.label}</Badge>
+                <div style={{fontSize:11,color:"#555",marginTop:6}}>Peringkat #{myPos}</div>
+              </div>
+            </div>
+          </Card>
+          {/* Tier progress */}
+          <Card style={{marginBottom:12}}>
+            {(()=>{
+              const tiers=[{min:0,max:100,l:"Starter → Bronze",c:"#cd7f32"},{min:100,max:250,l:"Bronze → Silver",c:"#c0c0c0"},{min:250,max:500,l:"Silver → Gold",c:"#ffd700"},{min:500,max:1000,l:"Gold → Diamond",c:"#60efff"},{min:1000,max:2500,l:"Diamond → Master",c:"#ff6bff"}];
+              const cur=tiers.find(t=>currentUser.lbp<t.max);
+              if(!cur) return <div style={{textAlign:"center",fontSize:15,color:"#ff6bff",fontWeight:700,padding:"8px 0"}}>👑 Kamu sudah di peringkat MASTER!</div>;
+              const pct=Math.min(100,Math.round(((currentUser.lbp-cur.min)/(cur.max-cur.min))*100));
+              return <>
+                <div style={{display:"flex",justifyContent:"space-between",marginBottom:10,fontSize:13}}><span style={{color:cur.c,fontWeight:700}}>{cur.l}</span><span style={{color:"#555"}}>{pct}%</span></div>
+                <ProgressBar pct={pct} color={cur.c}/>
+                <div style={{marginTop:8,fontSize:12,color:"#555",display:"flex",justifyContent:"space-between"}}><span>{currentUser.lbp} LBP</span><span>{cur.max-currentUser.lbp} lagi</span></div>
+              </>;
+            })()}
+          </Card>
+          <SecTitle>LBP Kamu Per Produk</SecTitle>
+          <Card style={{marginBottom:16}}>
+            <InfoRow label={<span style={{display:"flex",alignItems:"center",gap:4}}><LBPCoin size={13}/>LBP Base</span>} value={`${LBP_BASE_PER_SALE} LBP`} color="#ffd700"/>
+            <InfoRow label={`Bonus ${myCard?myCard.name:"(belum ada card)"}`} value={myCard?`+${myCard.lbpBonus} LBP`:"+0 LBP"} color={myCard?.color||"#555"}/>
+            <InfoRow label={<span style={{display:"flex",alignItems:"center",gap:4}}><LBPCoin size={13}/>Total LBP per Produk</span>} value={`${LBP_BASE_PER_SALE+(myCard?.lbpBonus||0)} LBP`} color="#ffd700"/>
+            <InfoRow label="Nilai per Produk" value={fmt((LBP_BASE_PER_SALE+(myCard?.lbpBonus||0))*LBP_TO_IDR)} color="#ffd700" border={false}/>
+          </Card>
+          <SecTitle>Konversi LBP → Rupiah</SecTitle>
+          <Card style={{marginBottom:16}}>
+            <div style={{background:"rgba(255,215,0,0.07)",border:"1px solid rgba(255,215,0,0.2)",borderRadius:10,padding:"10px 14px",marginBottom:14,fontSize:12,color:"#bbb",display:"flex",alignItems:"center",gap:6}}>
+              Kurs: <LBPCoin size={14}/><span style={{color:"#ffd700",fontWeight:700}}>1 LBP = {fmt(LBP_TO_IDR)}</span> · Hasil masuk ke wallet
+            </div>
+            <Inp label={<span style={{display:"flex",alignItems:"center",gap:4}}><LBPCoin size={13}/>Jumlah LBP (maks. {currentUser.lbp})</span>} type="number" inputMode="numeric" value={lbpConv} onChange={e=>setLbpConv(e.target.value)} placeholder={`Maks ${currentUser.lbp} LBP`}/>
+            {lbpConv&&parseInt(lbpConv)>0&&<div style={{background:"rgba(34,197,94,0.08)",border:"1px solid rgba(34,197,94,0.2)",borderRadius:10,padding:"10px 14px",marginBottom:14,fontSize:13,color:"#4ade80",fontWeight:700,textAlign:"center",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
+              <LBPDisplay amount={parseInt(lbpConv)} size={15} fontSize={13}/> → {fmt((parseInt(lbpConv)||0)*LBP_TO_IDR)}
+            </div>}
+            <Btn onClick={submitLbpConvert} style={{background:"linear-gradient(135deg,#854d0e,#ca8a04)"}}>Konversi LBP → Rupiah ✦</Btn>
+          </Card>
+          {/* Quick link to full history */}
+          <Btn variant="ghost" small onClick={()=>setSubPanel("lbpHistory")}>📋 Lihat Riwayat LBP Lengkap →</Btn>
+          <div style={{height:16}}/>
+          {/* Events */}
+          <SecTitle style={{marginTop:20}}>🎉 Event Aktif</SecTitle>
+          {ACTIVE_EVENTS.map(ev=>(
+            <Card key={ev.id} style={{marginBottom:10,border:`1px solid ${ev.color}30`,background:`linear-gradient(135deg,${ev.color}08,transparent)`}}>
+              <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:10}}>
+                <div style={{flex:1}}>
+                  <div style={{fontSize:14,fontWeight:800,color:ev.color,marginBottom:4}}>{ev.title}</div>
+                  <div style={{fontSize:12,color:"#777",lineHeight:1.5,marginBottom:6}}>{ev.desc}</div>
+                  <div style={{fontSize:11,color:"#ef4444",fontWeight:700}}>⏱ {getCountdown(ev.expiresDate)}</div>
+                </div>
+                <div style={{background:`${ev.color}20`,border:`1px solid ${ev.color}40`,borderRadius:10,padding:"6px 10px",fontSize:12,fontWeight:800,color:ev.color,whiteSpace:"nowrap",flexShrink:0}}>{ev.reward}</div>
+              </div>
+            </Card>
+          ))}
+          <div style={{height:16}}/>
+        </div>
+      </div>
+    );
+
+    // ── Main user pages ─────────────────────────────────────────────────────
+    return (
+      <div style={pageStyle}>
+        <Toast msg={toast}/>
+
+        {/* HOME */}
+        {activeNav==="home"&&<>
+          <div style={{background:"linear-gradient(160deg,#1a0533,#07070f)",padding:"48px 20px 24px"}}>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:20}}>
+              <div>
+                <div style={{fontSize:12,color:"#9333ea",fontWeight:700,letterSpacing:1}}>◈ NORTHGATE SALES</div>
+                <div style={{fontSize:22,fontWeight:800,color:"#e0e0e0",marginTop:2}}>Halo, {currentUser.username}! 👋</div>
+              </div>
+              <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:6}}>
+                <div style={{width:46,height:46,borderRadius:"50%",background:`linear-gradient(135deg,${rank.color},#1a0533)`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,fontWeight:800,border:`2px solid ${rank.color}55`}}>{currentUser.username[0]}</div>
+                <button onClick={logout} style={{background:"rgba(239,68,68,0.12)",border:"1px solid rgba(239,68,68,0.25)",borderRadius:8,padding:"5px 10px",color:"#ef4444",fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:ff}}>Logout</button>
+              </div>
+            </div>
+            <div style={{background:"rgba(255,255,255,0.04)",border:`1px solid ${rank.color}30`,borderRadius:18,padding:"16px 20px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+              <div>
+                <div style={{fontSize:11,color:"#666",fontWeight:700,letterSpacing:1,display:"flex",alignItems:"center",gap:5,marginBottom:4}}><LBPCoin size={14}/>LBP SAAT INI</div>
+                <LBPDisplay amount={currentUser.lbp} size={28} fontSize={34}/>
+                <div style={{fontSize:11,color:"#555",marginTop:2}}>Peringkat #{myPos} dari {sorted.length}</div>
+              </div>
+              <div style={{textAlign:"right"}}>
+                <div style={{fontSize:32}}>{rank.label.split(" ")[0]}</div>
+                <Badge c={rank.color}>{rank.label}</Badge>
+              </div>
+            </div>
+          </div>
+          <div style={{padding:"0 16px"}}>
+            <div style={{height:16}}/>
+
+            {/* Monthly target on home */}
+            {myCard&&<MonthlyTarget user={currentUser} myCard={myCard}/>}
+
+            {/* 4 CLICKABLE PANELS */}
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:8}}>
+              <Card onClick={()=>setSubPanel("sales")} style={{border:"1px solid rgba(74,222,128,0.25)",position:"relative",overflow:"hidden"}}>
+                <div style={{position:"absolute",top:10,right:12,fontSize:18,opacity:0.25}}>📈</div>
+                <div style={{fontSize:10,color:"#4ade80",fontWeight:700,letterSpacing:1,textTransform:"uppercase",marginBottom:6}}>Penjualan</div>
+                <div style={{fontSize:26,fontWeight:800,color:"#4ade80",lineHeight:1}}>{currentUser.soldToday}</div>
+                <div style={{fontSize:11,color:"#555",marginTop:4}}>unit hari ini</div>
+                <div style={{marginTop:10,fontSize:11,color:"#4ade80",fontWeight:600}}>Detail & Lapor ›</div>
+              </Card>
+              <Card onClick={()=>setSubPanel("wallet")} style={{border:"1px solid rgba(192,132,252,0.25)",position:"relative",overflow:"hidden"}}>
+                <div style={{position:"absolute",top:10,right:12,fontSize:18,opacity:0.25}}>💰</div>
+                <div style={{fontSize:10,color:"#c084fc",fontWeight:700,letterSpacing:1,textTransform:"uppercase",marginBottom:6}}>Wallet</div>
+                <div style={{fontSize:20,fontWeight:800,color:"#c084fc",lineHeight:1}}>{fmtK(walletTotal)}</div>
+                <div style={{fontSize:11,color:"#555",marginTop:4}}>saldo tersedia</div>
+                <div style={{marginTop:10,fontSize:11,color:"#c084fc",fontWeight:600}}>Detail & Withdraw ›</div>
+              </Card>
+              <Card onClick={()=>setSubPanel("lbp")} style={{border:"1px solid rgba(255,215,0,0.25)",position:"relative",overflow:"hidden"}}>
+                <div style={{position:"absolute",top:10,right:12,opacity:0.2}}><LBPCoin size={22}/></div>
+                <div style={{fontSize:10,color:"#ffd700",fontWeight:700,letterSpacing:1,textTransform:"uppercase",marginBottom:6,display:"flex",alignItems:"center",gap:4}}><LBPCoin size={12}/>LBP</div>
+                <LBPDisplay amount={currentUser.lbp} size={22} fontSize={26}/>
+                <div style={{fontSize:11,color:"#555",marginTop:4}}>LustBurnPoints</div>
+                <div style={{marginTop:10,fontSize:11,color:"#ffd700",fontWeight:600}}>Detail & Konversi ›</div>
+              </Card>
+              <Card style={{border:"1px solid rgba(96,239,255,0.25)",position:"relative",overflow:"hidden"}}>
+                <div style={{position:"absolute",top:10,right:12,fontSize:18,opacity:0.25}}>📦</div>
+                <div style={{fontSize:10,color:"#60efff",fontWeight:700,letterSpacing:1,textTransform:"uppercase",marginBottom:6}}>Stok</div>
+                <div style={{fontSize:26,fontWeight:800,color:"#60efff",lineHeight:1}}>{currentUser.stock}</div>
+                <div style={{fontSize:11,color:"#555",marginTop:4}}>unit dibawa</div>
+                <div style={{marginTop:10,fontSize:11,color:"#444",fontWeight:600}}>Total Sales: {currentUser.sales}</div>
+              </Card>
+            </div>
+            <div style={{fontSize:11,color:"#3a3a4a",textAlign:"center",marginBottom:16}}>💡 Tap Penjualan, Wallet, atau LBP untuk detail</div>
+
+            {/* Member card */}
+            <SecTitle>Member Card</SecTitle>
+            {myCard
+              ?<Card style={{marginBottom:16,border:`1px solid ${myCard.color}30`,background:`linear-gradient(135deg,${myCard.color}08,transparent)`}} onClick={()=>setActiveNav("shop")}>
+                <div style={{display:"flex",alignItems:"center",gap:14}}>
+                  <div style={{fontSize:36}}>{myCard.icon}</div>
+                  <div style={{flex:1}}>
+                    <div style={{fontSize:16,fontWeight:800,color:myCard.color}}>{myCard.name}</div>
+                    <div style={{fontSize:12,color:"#666",marginTop:4,display:"flex",alignItems:"center",gap:3}}>+{myCard.lbpBonus} <LBPCoin size={12}/>/produk · Total {LBP_BASE_PER_SALE+myCard.lbpBonus} <LBPCoin size={12}/>/produk</div>
+                  </div>
+                  <span style={{color:"#555",fontSize:18}}>›</span>
+                </div>
+              </Card>
+              :<Card style={{marginBottom:16,textAlign:"center"}}>
+                <div style={{fontSize:32,marginBottom:8}}>🃏</div>
+                <div style={{fontSize:13,color:"#666",marginBottom:12}}>Belum punya member card</div>
+                <Btn onClick={()=>setActiveNav("shop")} small variant="ghost">Lihat Shop →</Btn>
+              </Card>
+            }
+
+            {/* Referral quick card */}
+            <Card style={{marginBottom:16,background:"linear-gradient(135deg,rgba(34,197,94,0.06),transparent)",border:"1px solid rgba(34,197,94,0.2)"}} onClick={()=>setSubPanel("referral")}>
+              <div style={{display:"flex",alignItems:"center",gap:12}}>
+                <div style={{fontSize:28}}>👥</div>
+                <div style={{flex:1}}>
+                  <div style={{fontWeight:700,fontSize:14,color:"#4ade80"}}>Referral</div>
+                  <div style={{fontSize:12,color:"#666",marginTop:2}}>Ajak teman, dapat <span style={{color:"#4ade80",fontWeight:700}}>+{REFERRAL_LBP_BONUS}+ LBP</span> per teman</div>
+                  <div style={{marginTop:4,fontSize:11,color:"#666"}}>Kode kamu: <span style={{color:"#4ade80",fontWeight:700,letterSpacing:1}}>{currentUser.referralCode}</span> · {(currentUser.referrals||[]).length} teman</div>
+                </div>
+                <span style={{color:"#555",fontSize:18}}>›</span>
+              </div>
+            </Card>
+
+            {/* Event preview with countdown */}
+            <SecTitle>🎉 Event Aktif</SecTitle>
+            {ACTIVE_EVENTS.slice(0,2).map(ev=>(
+              <Card key={ev.id} style={{marginBottom:10,border:`1px solid ${ev.color}30`,background:`linear-gradient(135deg,${ev.color}06,transparent)`}}>
+                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10}}>
+                  <div style={{flex:1}}>
+                    <div style={{fontSize:14,fontWeight:700,color:ev.color}}>{ev.title}</div>
+                    <div style={{fontSize:11,color:"#666",marginTop:3}}>{ev.desc}</div>
+                    <div style={{fontSize:10,color:"#ef4444",fontWeight:600,marginTop:4}}>⏱ {getCountdown(ev.expiresDate)}</div>
+                  </div>
+                  <div style={{background:`${ev.color}20`,border:`1px solid ${ev.color}40`,borderRadius:10,padding:"6px 10px",fontSize:11,fontWeight:800,color:ev.color,whiteSpace:"nowrap",flexShrink:0}}>{ev.reward}</div>
+                </div>
+              </Card>
+            ))}
+            <button onClick={()=>setSubPanel("lbp")} style={{width:"100%",padding:"10px",borderRadius:10,border:"1px solid rgba(255,255,255,0.07)",background:"rgba(255,255,255,0.02)",color:"#555",fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:ff,marginBottom:16}}>Lihat semua event & konversi LBP →</button>
+          </div>
+        </>}
+
+        {/* SHOP */}
+        {activeNav==="shop"&&<>
+          <div style={{background:"linear-gradient(160deg,#1a0533,#07070f)",padding:"48px 20px 20px",marginBottom:4}}>
+            <div style={{fontSize:11,color:"#9333ea",fontWeight:700,letterSpacing:2,textTransform:"uppercase"}}>◈ Toko</div>
+            <div style={{fontSize:24,fontWeight:800,color:"#e0e0e0",marginTop:2}}>Member Card Shop</div>
+            <div style={{marginTop:8,display:"flex",alignItems:"center",gap:8}}>
+              <span style={{fontSize:13,color:"#666"}}>Saldo:</span>
+              <LBPDisplay amount={currentUser.lbp} size={20} fontSize={18}/>
+              <span style={{fontSize:12,color:"#555"}}>≈ {fmt(currentUser.lbp*LBP_TO_IDR)}</span>
+            </div>
+          </div>
+          <div style={{padding:"0 16px"}}>
+            <div style={{height:16}}/>
+            <div style={{background:"rgba(255,215,0,0.06)",border:"1px solid rgba(255,215,0,0.2)",borderRadius:12,padding:"12px 16px",marginBottom:16,fontSize:12,color:"#bbb"}}>
+              Semua member card memberikan <span style={{color:"#ffd700",fontWeight:700}}>bonus LBP tambahan</span> + <span style={{color:"#4ade80",fontWeight:700}}>bonus referral</span> per produk terjual.
+            </div>
+            {MEMBER_CARDS.map(card=>{
+              const owned=currentUser.ownedCards?.includes(card.id);
+              const active=currentUser.memberCard===card.id;
+              const canBuy=currentUser.lbp>=card.price;
+              return (
+                <div key={card.id} onClick={()=>setShopDetail(card)} style={{background:active?`linear-gradient(135deg,${card.color}10,#07070f)`:"rgba(255,255,255,0.03)",border:`1px solid ${active?card.color+"50":card.color+"20"}`,borderRadius:18,padding:"16px 18px",marginBottom:12,display:"flex",alignItems:"center",gap:16,cursor:"pointer",boxShadow:active?`0 0 24px ${card.color}15`:"none"}}>
+                  <div style={{fontSize:36,flexShrink:0}}>{card.icon}</div>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontWeight:800,fontSize:16,color:card.color}}>{card.name}</div>
+                    <div style={{fontSize:12,color:"#666",marginTop:3,display:"flex",alignItems:"center",gap:3}}>+{card.lbpBonus} <LBPCoin size={12}/>/produk · Total {LBP_BASE_PER_SALE+card.lbpBonus} <LBPCoin size={12}/></div>
+                    <div style={{marginTop:6}}>
+                      {active?<Badge c={card.color} sm>AKTIF</Badge>:owned?<Badge c="#666" sm>DIMILIKI</Badge>:canBuy?<Badge c={card.color} sm>{card.price} LBP</Badge>:<Badge c="#444" sm>Butuh {card.price} LBP</Badge>}
+                    </div>
+                  </div>
+                  <div style={{fontSize:18,color:"#444"}}>›</div>
+                </div>
+              );
+            })}
+            <div style={{height:12}}/>
+          </div>
+        </>}
+
+        {/* RANKING */}
+        {activeNav==="ranking"&&<>
+          <div style={{background:"linear-gradient(160deg,#1a0533,#07070f)",padding:"48px 20px 20px",marginBottom:4}}>
+            <div style={{fontSize:11,color:"#9333ea",fontWeight:700,letterSpacing:2,textTransform:"uppercase"}}>◈ Papan Skor</div>
+            <div style={{fontSize:24,fontWeight:800,color:"#e0e0e0",marginTop:2}}>Leaderboard</div>
+          </div>
+          <div style={{padding:"0 16px"}}>
+            <div style={{height:16}}/>
+            {sorted.map((u,i)=>{
+              const r=getRank(u.lbp); const medals=["🥇","🥈","🥉"]; const isMe=u.id===currentUser.id;
+              const uCard=MEMBER_CARDS.find(c=>c.id===u.memberCard);
+              return (
+                <Card key={u.id} style={{marginBottom:10,display:"flex",alignItems:"center",gap:14,border:isMe?`1px solid ${r.color}45`:"1px solid rgba(255,255,255,0.07)",background:isMe?`linear-gradient(135deg,${r.color}10,#07070f)`:"rgba(255,255,255,0.03)",boxShadow:isMe?`0 0 20px ${r.color}12`:"none"}}>
+                  <div style={{fontSize:24,minWidth:34,textAlign:"center"}}>{medals[i]||<span style={{fontSize:14,color:"#555",fontWeight:700}}>#{i+1}</span>}</div>
+                  <div style={{width:42,height:42,borderRadius:"50%",background:`linear-gradient(135deg,${r.color},#07070f)`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:17,fontWeight:800,border:`2px solid ${r.color}40`,flexShrink:0}}>{u.username[0]}</div>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontWeight:700,fontSize:15,color:isMe?r.color:"#e0e0e0"}}>{u.username}{isMe&&<span style={{fontSize:11,color:"#555"}}> (kamu)</span>}</div>
+                    <div style={{display:"flex",alignItems:"center",gap:6,marginTop:3,flexWrap:"wrap"}}>
+                      <Badge c={r.color} sm>{r.label}</Badge>
+                      {uCard&&<Badge c={uCard.color} sm>{uCard.icon} {uCard.name}</Badge>}
+                    </div>
+                  </div>
+                  <div style={{textAlign:"right",flexShrink:0}}>
+                    <LBPDisplay amount={u.lbp} size={18} fontSize={20}/>
+                    <div style={{fontSize:10,color:"#555",marginTop:2}}>{u.sales} sales</div>
+                  </div>
+                </Card>
+              );
+            })}
+          </div>
+        </>}
+
+        <BottomNav items={userNav} active={activeNav} onNav={n=>{setActiveNav(n);setSubPanel(null);}}/>
+      </div>
+    );
+  }
+
+  return null;
+}
+
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(React.createElement(App));
+    hideSplash();
+  </script>
+</body>
+</html>
