@@ -25,13 +25,13 @@
     .sp-content{position:relative;z-index:2;display:flex;flex-direction:column;align-items:center}
     .sp-logo{width:72px;height:72px;border-radius:20px;background:linear-gradient(135deg,#3b0764,#1e0040);border:1px solid rgba(139,92,246,0.5);display:flex;align-items:center;justify-content:center;font-size:32px;margin-bottom:22px;box-shadow:0 0 40px rgba(139,92,246,0.35),0 0 80px rgba(139,92,246,0.12);animation:spLogo 0.6s cubic-bezier(0.34,1.56,0.64,1) both}
     .sp-title{font-size:26px;font-weight:800;letter-spacing:6px;background:linear-gradient(135deg,#fff,#c084fc);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:5px;animation:spUp 0.5s 0.25s ease both}
-    .sp-sub{font-size:10px;letter-spacing:4px;color:#7c3aed;text-transform:uppercase;font-weight:600;animation:spUp 0.5s 0.35s ease both}
-    .sp-tag{font-size:12px;color:#3a3a5c;margin:16px 0 40px;letter-spacing:0.5px;animation:spUp 0.5s 0.45s ease both}
+    .sp-sub{font-size:10px;letter-spacing:4px;color:#a78bfa;text-transform:uppercase;font-weight:600;animation:spUp 0.5s 0.35s ease both}
+    .sp-tag{font-size:12px;color:#7c7a9e;margin:16px 0 40px;letter-spacing:0.5px;animation:spUp 0.5s 0.45s ease both}
     .sp-bar-wrap{width:180px;display:flex;flex-direction:column;align-items:center;gap:10px;opacity:0;animation:spUp 0.5s 0.7s ease forwards}
     .sp-bar-track{width:100%;height:3px;background:rgba(255,255,255,0.07);border-radius:3px;overflow:hidden;position:relative}
     .sp-bar-fill{height:100%;width:0%;border-radius:3px;background:linear-gradient(90deg,#5b21b6,#9333ea,#c084fc);animation:spBar 9s 0.9s cubic-bezier(0.25,0.46,0.45,0.94) forwards;position:relative}
     .sp-bar-fill::after{content:"";position:absolute;top:0;left:0;right:0;bottom:0;background:linear-gradient(90deg,transparent 0%,rgba(255,255,255,0.35) 50%,transparent 100%);animation:spShimmer 1.8s 1s ease-in-out infinite}
-    .sp-loading{font-size:9px;color:#2d2d4a;letter-spacing:2px;text-transform:uppercase}
+    .sp-loading{font-size:9px;color:#5e5c80;letter-spacing:2px;text-transform:uppercase}
     @keyframes spLogo{0%{opacity:0;transform:scale(0.3) rotate(-15deg)}60%{transform:scale(1.08) rotate(3deg)}100%{opacity:1;transform:scale(1) rotate(0)}}
     @keyframes spUp{0%{opacity:0;transform:translateY(18px)}100%{opacity:1;transform:translateY(0)}}
     @keyframes spOrb{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(20px,-20px) scale(1.05)}}
@@ -59,12 +59,32 @@
   </div>
   <div id="root"></div>
 
-  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
-  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
-  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin
+    onerror="window._cdnError='React gagal dimuat dari CDN. Periksa koneksi internet kamu.'"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin
+    onerror="window._cdnError='ReactDOM gagal dimuat dari CDN. Periksa koneksi internet kamu.'"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"
+    onerror="window._cdnError='Babel gagal dimuat dari CDN. Periksa koneksi internet kamu.'"></script>
 
   <script>
-    // hideSplash dipanggil oleh React setelah mount, bukan timer buta
+    // ── Tampilkan pesan error di atas splash/root ──────────────────────────────
+    function showFatalError(msg) {
+      // Sembunyikan splash dulu
+      var s = document.getElementById('splash');
+      if (s) s.style.display = 'none';
+      // Tampilkan error screen
+      var r = document.getElementById('root');
+      if (r) {
+        r.innerHTML = '<div style="min-height:100vh;background:#08060f;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#ede9f6;font-family:system-ui,sans-serif;padding:32px 24px;text-align:center;box-sizing:border-box">'
+          + '<div style="font-size:48px;margin-bottom:16px">⚠️</div>'
+          + '<div style="font-size:20px;font-weight:800;color:#fb7185;margin-bottom:12px">Gagal Memuat Aplikasi</div>'
+          + '<div style="font-size:13px;color:#6b6b9a;line-height:1.7;max-width:300px;margin-bottom:28px">' + msg + '</div>'
+          + '<button onclick="location.reload()" style="background:linear-gradient(135deg,#6d28d9,#a78bfa);border:none;border-radius:12px;padding:13px 28px;color:#fff;font-size:14px;font-weight:700;cursor:pointer;font-family:system-ui">🔄 Coba Lagi</button>'
+          + '</div>';
+      }
+    }
+
+    // ── hideSplash: dipanggil React setelah mount, bukan timer buta ───────────
     window._splashHidden = false;
     window.hideSplash = function() {
       if (window._splashHidden) return;
@@ -75,10 +95,51 @@
         setTimeout(function(){ s.style.display = 'none'; }, 700);
       }
     };
-    // Fallback safety: sembunyikan splash setelah 12 detik kalau React gagal mount
-    // (Babel butuh waktu untuk compile 3000+ baris JSX di browser)
-    setTimeout(window.hideSplash, 12000);
-    if('serviceWorker' in navigator){window.addEventListener('load',function(){navigator.serviceWorker.register('sw.js').catch(function(){});});}
+
+    // ── Cek CDN gagal load (React / ReactDOM / Babel) ─────────────────────────
+    if (window._cdnError) {
+      showFatalError(window._cdnError);
+    } else {
+      // ── Cek React & Babel tersedia ─────────────────────────────────────────
+      if (typeof React === 'undefined') {
+        showFatalError('React tidak tersedia. Kemungkinan koneksi internet bermasalah atau CDN unpkg.com tidak dapat diakses.');
+      } else if (typeof Babel === 'undefined') {
+        showFatalError('Babel tidak tersedia. Kemungkinan koneksi internet bermasalah atau CDN unpkg.com tidak dapat diakses.');
+      } else {
+        // ── Semua CDN OK: pasang fallback timeout ───────────────────────────
+        // Kalau React tidak mount dalam 15 detik (compile Babel lambat / error JSX),
+        // tampilkan pesan error informatif — bukan blank.
+        window._mountTimeout = setTimeout(function() {
+          if (!window._splashHidden) {
+            // React belum mount sama sekali → kemungkinan JSX syntax error
+            showFatalError(
+              'Aplikasi gagal diinisialisasi dalam waktu yang diharapkan. '
+              + 'Kemungkinan ada error di kode JSX. '
+              + 'Coba reload halaman, atau hubungi developer.'
+            );
+          }
+        }, 15000);
+      }
+    }
+
+    // ── Global error handler: tangkap syntax/runtime error dari Babel compile ─
+    window.addEventListener('error', function(e) {
+      console.error('Global error:', e.message, e.filename, e.lineno);
+      // Jika splash masih tampil (artinya React belum mount) → tampilkan error
+      if (!window._splashHidden) {
+        clearTimeout(window._mountTimeout);
+        showFatalError(
+          'Error saat memuat aplikasi:\n"' + (e.message || 'Unknown error') + '"'
+          + '\n\nCoba reload halaman.'
+        );
+      }
+    });
+
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', function() {
+        navigator.serviceWorker.register('sw.js').catch(function(){});
+      });
+    }
   </script>
 
   <script type="text/babel">
@@ -110,7 +171,7 @@ const MEMBER_CARDS = [
   { id:"silver",  name:"Silver Card",  icon:"🥈", color:"#c0c0c0", price:80,
     target:25,  lbpBonus:2,  referralPct:25,  dailyCap:150,
     perks:["Target 25 penjualan/bulan","+2 LBP/produk (total 5 LBP)","Daily LBP cap: 150/hari","Priority support","Referral bonus +50 LBP","Badge Silver Member"] },
-  { id:"gold",    name:"Gold Card",    icon:"🥇", color:"#f59e0b", price:180,
+  { id:"gold",    name:"Gold Card",    icon:"🥇", color:"#fbbf24", price:180,
     target:50,  lbpBonus:4,  referralPct:50,  dailyCap:200,
     perks:["Target 50 penjualan/bulan","+4 LBP/produk (total 7 LBP)","Daily LBP cap: 200/hari","Akses analytics","Referral bonus +100 LBP","Badge Gold Member"] },
   { id:"diamond", name:"Diamond Card", icon:"💎", color:"#60efff", price:400,
@@ -122,10 +183,10 @@ const MEMBER_CARDS = [
 ];
 
 const ACTIVE_EVENTS = [
-  { id:"e1", title:"🔥 Flash Sale Weekend",  desc:"Bonus LBP ×2 setiap penjualan Sabtu & Minggu",               reward:"+2× LBP",   color:"#f87171", expiresDate:"2026-03-08", type:"lbp"    },
-  { id:"e2", title:"⭐ Star Seller March",   desc:"Capai 50 penjualan bulan ini → bonus 200 LBP",               reward:"+200 LBP",  color:"#f59e0b", expiresDate:"2026-03-31", type:"lbp"    },
+  { id:"e1", title:"🔥 Flash Sale Weekend",  desc:"Bonus LBP ×2 setiap penjualan Sabtu & Minggu",               reward:"+2× LBP",   color:"#fb7185", expiresDate:"2026-03-08", type:"lbp"    },
+  { id:"e2", title:"⭐ Star Seller March",   desc:"Capai 50 penjualan bulan ini → bonus 200 LBP",               reward:"+200 LBP",  color:"#fbbf24", expiresDate:"2026-03-31", type:"lbp"    },
   { id:"e3", title:"💎 Diamond Rush",        desc:"Naik ke tier Diamond bulan ini → bonus Rp 50.000 ke wallet",  reward:"+Rp 50K",   color:"#60efff", expiresDate:"2026-03-31", type:"wallet" },
-  { id:"e4", title:"🎯 New Member Boost",   desc:"User baru jual 10 produk minggu ini → bonus Rp 25.000",       reward:"+Rp 25K",   color:"#34d399", expiresDate:"2026-03-10", type:"wallet" },
+  { id:"e4", title:"🎯 New Member Boost",   desc:"User baru jual 10 produk minggu ini → bonus Rp 25.000",       reward:"+Rp 25K",   color:"#4ade80", expiresDate:"2026-03-10", type:"wallet" },
 ];
 
 const DB = {
@@ -177,7 +238,7 @@ const ff   = "system-ui,-apple-system,'Segoe UI',sans-serif";
 const getRank = (lbp) => {
   if (lbp>=2500) return {label:"👑 Master",  color:"#ff6bff"};
   if (lbp>=1000) return {label:"💎 Diamond", color:"#60efff"};
-  if (lbp>=500)  return {label:"🥇 Gold",    color:"#f59e0b"};
+  if (lbp>=500)  return {label:"🥇 Gold",    color:"#fbbf24"};
   if (lbp>=250)  return {label:"🥈 Silver",  color:"#c0c0c0"};
   if (lbp>=100)  return {label:"🥉 Bronze",  color:"#cd7f32"};
   return               {label:"🌱 Starter",  color:"#7fff7f"};
@@ -252,12 +313,13 @@ const C = {
   bg:     "#08060f",
   surf:   "rgba(255,255,255,0.03)",
   border: "rgba(255,255,255,0.07)",
-  text:   "#d4d4e8",
-  sub:    "#4a4a6a",
-  accent: "#8b5cf6",
-  green:  "#34d399",
-  red:    "#f87171",
-  gold:   "#f59e0b",
+  text:   "#ede9f6",   // warm soft white — tidak biru, tidak menyilaukan
+  sub:    "#7c7a9e",   // medium purple-grey — terbaca jelas, tidak terlalu redup
+  muted:  "#4e4c6a",   // untuk elemen placeholder / hints
+  accent: "#a78bfa",   // violet lebih terang — konsisten dengan tema purple gelap
+  green:  "#4ade80",   // hijau lebih cerah — mudah dibaca di dark bg
+  red:    "#fb7185",   // merah soft rose — tidak menusuk mata
+  gold:   "#fbbf24",   // amber hangat — lebih readable dari oranye
 };
 
 // ─── Base Components ──────────────────────────────────────────────────────────
@@ -304,7 +366,7 @@ const Btn = ({children, onClick, variant="primary", disabled, style, small}) => 
     ...style,
   };
   const themes = {
-    primary: {background:"linear-gradient(135deg,#6d28d9,#8b5cf6)", color:"#fff", boxShadow:"0 2px 14px rgba(109,40,217,0.28)"},
+    primary: {background:"linear-gradient(135deg,#6d28d9,#a78bfa)", color:"#fff", boxShadow:"0 2px 14px rgba(109,40,217,0.28)"},
     ghost:   {background:"rgba(139,92,246,0.08)", color:C.accent, border:`1px solid rgba(139,92,246,0.22)`},
     success: {background:"linear-gradient(135deg,#059669,#10b981)", color:"#fff", boxShadow:"0 2px 10px rgba(5,150,105,0.25)"},
     danger:  {background:"rgba(248,113,113,0.09)", color:C.red, border:`1px solid rgba(248,113,113,0.2)`},
@@ -625,7 +687,7 @@ const ChatPanel = ({user, chat, setChat, onBack}) => {
               {showDate&&<div style={{textAlign:"center",fontSize:11,color:C.sub,margin:"12px 0",fontWeight:600}}>{m.date}</div>}
               <div style={{display:"flex",justifyContent:isUser?"flex-end":"flex-start",marginBottom:8}}>
                 <div style={{maxWidth:"78%"}}>
-                  <div style={{background:isUser?"linear-gradient(135deg,#6d28d9,#8b5cf6)":"rgba(255,255,255,0.07)",borderRadius:isUser?"18px 18px 4px 18px":"18px 18px 18px 4px",padding:"10px 14px",fontSize:14,color:C.text,lineHeight:1.5}}>
+                  <div style={{background:isUser?"linear-gradient(135deg,#6d28d9,#a78bfa)":"rgba(255,255,255,0.07)",borderRadius:isUser?"18px 18px 4px 18px":"18px 18px 18px 4px",padding:"10px 14px",fontSize:14,color:C.text,lineHeight:1.5}}>
                     {m.text}
                   </div>
                   <div style={{fontSize:10,color:C.sub,marginTop:3,textAlign:isUser?"right":"left"}}>
@@ -643,7 +705,7 @@ const ChatPanel = ({user, chat, setChat, onBack}) => {
       <div style={{position:"fixed",bottom:0,left:0,right:0,maxWidth:480,margin:"0 auto",padding:"12px 16px",background:"rgba(8,6,18,0.97)",borderTop:"1px solid rgba(255,255,255,0.07)",backdropFilter:"blur(20px)",display:"flex",gap:10,alignItems:"center",paddingBottom:"calc(12px + env(safe-area-inset-bottom,0px))"}}>
         <input value={msg} onChange={e=>setMsg(e.target.value)} onKeyDown={e=>e.key==="Enter"&&send()}
           placeholder="Ketik pesan..." style={{flex:1,background:"rgba(255,255,255,0.07)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:20,padding:"11px 16px",color:C.text,fontSize:15,outline:"none",fontFamily:ff}}/>
-        <button onClick={send} style={{width:44,height:44,borderRadius:"50%",background:msg.trim()?"linear-gradient(135deg,#6d28d9,#8b5cf6)":"rgba(255,255,255,0.06)",border:"none",cursor:msg.trim()?"pointer":"default",fontSize:18,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,transition:"background 0.2s"}}>
+        <button onClick={send} style={{width:44,height:44,borderRadius:"50%",background:msg.trim()?"linear-gradient(135deg,#6d28d9,#a78bfa)":"rgba(255,255,255,0.06)",border:"none",cursor:msg.trim()?"pointer":"default",fontSize:18,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,transition:"background 0.2s"}}>
           ➤
         </button>
       </div>
@@ -710,7 +772,7 @@ const AdminChatPanel = ({adminUser, targetUser, chat, setChat, onBack}) => {
               {showDate&&<div style={{textAlign:"center",fontSize:11,color:C.sub,margin:"12px 0",fontWeight:600}}>{m.date}</div>}
               <div style={{display:"flex",justifyContent:isAdmin?"flex-end":"flex-start",marginBottom:8}}>
                 <div style={{maxWidth:"78%"}}>
-                  <div style={{background:isAdmin?"linear-gradient(135deg,#6d28d9,#8b5cf6)":"rgba(255,255,255,0.07)",borderRadius:isAdmin?"18px 18px 4px 18px":"18px 18px 18px 4px",padding:"10px 14px",fontSize:14,color:C.text,lineHeight:1.5}}>
+                  <div style={{background:isAdmin?"linear-gradient(135deg,#6d28d9,#a78bfa)":"rgba(255,255,255,0.07)",borderRadius:isAdmin?"18px 18px 4px 18px":"18px 18px 18px 4px",padding:"10px 14px",fontSize:14,color:C.text,lineHeight:1.5}}>
                     {m.text}
                   </div>
                   <div style={{fontSize:10,color:C.sub,marginTop:3,textAlign:isAdmin?"right":"left"}}>
@@ -727,7 +789,7 @@ const AdminChatPanel = ({adminUser, targetUser, chat, setChat, onBack}) => {
       <div style={{position:"fixed",bottom:0,left:0,right:0,maxWidth:480,margin:"0 auto",padding:"12px 16px",background:"rgba(8,6,18,0.97)",borderTop:"1px solid rgba(255,255,255,0.07)",backdropFilter:"blur(20px)",display:"flex",gap:10,alignItems:"center",paddingBottom:"calc(12px + env(safe-area-inset-bottom,0px))"}}>
         <input value={msg} onChange={e=>setMsg(e.target.value)} onKeyDown={e=>e.key==="Enter"&&send()}
           placeholder={`Balas ${targetUser.username}...`} style={{flex:1,background:"rgba(255,255,255,0.07)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:20,padding:"11px 16px",color:C.text,fontSize:15,outline:"none",fontFamily:ff}}/>
-        <button onClick={send} style={{width:44,height:44,borderRadius:"50%",background:msg.trim()?"linear-gradient(135deg,#6d28d9,#8b5cf6)":"rgba(255,255,255,0.06)",border:"none",cursor:msg.trim()?"pointer":"default",fontSize:18,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+        <button onClick={send} style={{width:44,height:44,borderRadius:"50%",background:msg.trim()?"linear-gradient(135deg,#6d28d9,#a78bfa)":"rgba(255,255,255,0.06)",border:"none",cursor:msg.trim()?"pointer":"default",fontSize:18,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
           ➤
         </button>
       </div>
@@ -1055,12 +1117,12 @@ const MiningPanel = ({ currentUser, onEarn, onBuyRig }) => {
             <div style={{fontSize:13,fontWeight:800,color:C.gold}}>{fragments.toFixed(1)} / {FRAGS_PER_LBP}</div>
           </div>
           <div style={{background:"rgba(255,255,255,0.06)",borderRadius:100,height:10,overflow:"hidden",marginBottom:8}}>
-            <div style={{height:"100%",width:`${progressPct}%`,background:`linear-gradient(90deg,#7c3aed,${progressPct>=100?"#4ade80":"#ffd700"})`,borderRadius:100,transition:"width 0.1s ease"}}/>
+            <div style={{height:"100%",width:`${progressPct}%`,background:`linear-gradient(90deg,#a78bfa,${progressPct>=100?"#4ade80":"#ffd700"})`,borderRadius:100,transition:"width 0.1s ease"}}/>
           </div>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
             <div style={{fontSize:11,color:C.sub}}>{progressPct.toFixed(1)}% menuju 1 LBP</div>
             {fragments>=FRAGS_PER_LBP&&(
-              <button onClick={claimManual} style={{background:"linear-gradient(135deg,#6d28d9,#8b5cf6)",border:"none",borderRadius:20,padding:"5px 14px",color:"#fff",fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:ff,boxShadow:"0 3px 12px rgba(139,92,246,0.4)"}}>
+              <button onClick={claimManual} style={{background:"linear-gradient(135deg,#6d28d9,#a78bfa)",border:"none",borderRadius:20,padding:"5px 14px",color:"#fff",fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:ff,boxShadow:"0 3px 12px rgba(139,92,246,0.4)"}}>
                 ✦ Claim LBP!
               </button>
             )}
@@ -1124,7 +1186,7 @@ const MiningPanel = ({ currentUser, onEarn, onBuyRig }) => {
                         ?<span style={{fontSize:11,color:r.color,fontWeight:700,background:`${r.color}15`,border:`1px solid ${r.color}30`,borderRadius:20,padding:"3px 10px"}}>✓ Dimiliki</span>
                         :<div>
                           <div style={{fontSize:12,fontWeight:700,color:C.gold,marginBottom:4,textAlign:"right"}}>{r.cost} LBP</div>
-                          <button onClick={()=>onBuyRig(r)} disabled={!canBuy} style={{background:canBuy?"linear-gradient(135deg,#6d28d9,#8b5cf6)":"rgba(255,255,255,0.05)",border:"none",borderRadius:10,padding:"5px 14px",color:canBuy?"#fff":"#444",fontSize:11,fontWeight:700,cursor:canBuy?"pointer":"not-allowed",fontFamily:ff,opacity:canBuy?1:0.6}}>
+                          <button onClick={()=>onBuyRig(r)} disabled={!canBuy} style={{background:canBuy?"linear-gradient(135deg,#6d28d9,#a78bfa)":"rgba(255,255,255,0.05)",border:"none",borderRadius:10,padding:"5px 14px",color:canBuy?"#fff":"#444",fontSize:11,fontWeight:700,cursor:canBuy?"pointer":"not-allowed",fontFamily:ff,opacity:canBuy?1:0.6}}>
                             {canBuy?"Beli":isNext?`Kurang ${r.cost-currentUser.lbp} LBP`:"Unlock dulu"}
                           </button>
                         </div>
@@ -1209,7 +1271,7 @@ const CHANGELOG = [
     ]
   },
   {
-    version:"v2.0", date:"1 Mar 2026", badge:"", color:"#8b5cf6",
+    version:"v2.0", date:"1 Mar 2026", badge:"", color:"#a78bfa",
     changes:[
       "🪙 Sistem LBP & mining panel",
       "🏪 Card shop dengan 5 tier",
@@ -1223,18 +1285,18 @@ const ChangelogModal = ({onClose}) => (
   <div onClick={onClose} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.75)",zIndex:9000,display:"flex",alignItems:"flex-end",justifyContent:"center",backdropFilter:"blur(6px)"}}>
     <div onClick={e=>e.stopPropagation()} style={{background:"#0e0a1e",borderRadius:"20px 20px 0 0",padding:"24px 20px 36px",width:"100%",maxWidth:480,maxHeight:"80vh",overflowY:"auto"}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
-        <div style={{fontSize:16,fontWeight:800,color:"#d4d4e8",letterSpacing:1}}>📋 Changelog</div>
-        <button onClick={onClose} style={{background:"none",border:"none",color:"#4a4a6a",fontSize:20,cursor:"pointer",fontFamily:"inherit"}}>✕</button>
+        <div style={{fontSize:16,fontWeight:800,color:"#ede9f6",letterSpacing:1}}>📋 Changelog</div>
+        <button onClick={onClose} style={{background:"none",border:"none",color:"#7c7a9e",fontSize:20,cursor:"pointer",fontFamily:"inherit"}}>✕</button>
       </div>
       {CHANGELOG.map(entry=>(
         <div key={entry.version} style={{marginBottom:20,background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.07)",borderRadius:14,padding:"14px 16px"}}>
           <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}>
             <span style={{fontSize:16,fontWeight:800,color:entry.color}}>{entry.version}</span>
             {entry.badge&&<span style={{fontSize:9,background:entry.color,color:"#000",borderRadius:6,padding:"2px 7px",fontWeight:800,letterSpacing:1}}>{entry.badge.toUpperCase()}</span>}
-            <span style={{marginLeft:"auto",fontSize:11,color:"#4a4a6a"}}>{entry.date}</span>
+            <span style={{marginLeft:"auto",fontSize:11,color:"#7c7a9e"}}>{entry.date}</span>
           </div>
           {entry.changes.map((c,i)=>(
-            <div key={i} style={{fontSize:12,color:"#d4d4e8",padding:"4px 0",borderBottom:i<entry.changes.length-1?"1px solid rgba(255,255,255,0.04)":"none"}}>{c}</div>
+            <div key={i} style={{fontSize:12,color:"#ede9f6",padding:"4px 0",borderBottom:i<entry.changes.length-1?"1px solid rgba(255,255,255,0.04)":"none"}}>{c}</div>
           ))}
         </div>
       ))}
@@ -1254,11 +1316,11 @@ class ErrorBoundary extends React.Component {
   render() {
     if (this.state.hasError) {
       return (
-        <div style={{minHeight:"100vh",background:"#08060f",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",color:"#d4d4e8",fontFamily:"system-ui,sans-serif",padding:"32px 24px",textAlign:"center"}}>
+        <div style={{minHeight:"100vh",background:"#08060f",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",color:"#ede9f6",fontFamily:"system-ui,sans-serif",padding:"32px 24px",textAlign:"center"}}>
           <div style={{fontSize:48,marginBottom:16}}>⚠️</div>
-          <div style={{fontSize:20,fontWeight:800,color:"#f87171",marginBottom:8}}>Terjadi Error</div>
-          <div style={{fontSize:13,color:"#4a4a6a",marginBottom:24,maxWidth:280,lineHeight:1.6}}>{String(this.state.error?.message||this.state.error||"Unknown error")}</div>
-          <button onClick={()=>window.location.reload()} style={{background:"linear-gradient(135deg,#6d28d9,#8b5cf6)",border:"none",borderRadius:12,padding:"13px 28px",color:"#fff",fontSize:14,fontWeight:700,cursor:"pointer"}}>🔄 Reload App</button>
+          <div style={{fontSize:20,fontWeight:800,color:"#fb7185",marginBottom:8}}>Terjadi Error</div>
+          <div style={{fontSize:13,color:"#7c7a9e",marginBottom:24,maxWidth:280,lineHeight:1.6}}>{String(this.state.error?.message||this.state.error||"Unknown error")}</div>
+          <button onClick={()=>window.location.reload()} style={{background:"linear-gradient(135deg,#6d28d9,#a78bfa)",border:"none",borderRadius:12,padding:"13px 28px",color:"#fff",fontSize:14,fontWeight:700,cursor:"pointer"}}>🔄 Reload App</button>
         </div>
       );
     }
@@ -1307,7 +1369,8 @@ function App() {
 
   // Countdown ticker
   useEffect(()=>{
-    // Hide splash once React has mounted dan paint selesai (double rAF = after paint)
+    // React berhasil mount → cancel fallback error timeout & sembunyikan splash
+    clearTimeout(window._mountTimeout);
     requestAnimationFrame(()=>requestAnimationFrame(window.hideSplash));
     const id=setInterval(()=>{
       setTick(p=>p+1);
@@ -1560,7 +1623,7 @@ function App() {
           <InfoRow label="Harga"      value={fmt(tier.priceMonthly)+"/bln"} color={tier.color} border={false}/>
         </div>
         <button onClick={()=>{setScreen("login");setPricingStep(0);setBizForm({name:"",contactName:"",contactPhone:"",email:"",note:""});}}
-          style={{background:"linear-gradient(135deg,#6d28d9,#8b5cf6)",border:"none",borderRadius:14,padding:"14px 32px",color:"#fff",fontSize:15,fontWeight:700,cursor:"pointer",fontFamily:ff}}>
+          style={{background:"linear-gradient(135deg,#6d28d9,#a78bfa)",border:"none",borderRadius:14,padding:"14px 32px",color:"#fff",fontSize:15,fontWeight:700,cursor:"pointer",fontFamily:ff}}>
           Kembali ke Login
         </button>
       </div>
@@ -1600,7 +1663,7 @@ function App() {
             <span style={{fontSize:12,color:C.sub}}>Total per bulan</span>
             <span style={{fontSize:18,fontWeight:800,color:tier.color}}>{fmt(tier.priceMonthly)}</span>
           </div>
-          <button onClick={submitBizRequest} style={{width:"100%",background:"linear-gradient(135deg,#6d28d9,#8b5cf6)",border:"none",borderRadius:14,padding:"15px",color:"#fff",fontSize:15,fontWeight:700,cursor:"pointer",fontFamily:ff,boxShadow:"0 4px 20px rgba(109,40,217,0.3)"}}>
+          <button onClick={submitBizRequest} style={{width:"100%",background:"linear-gradient(135deg,#6d28d9,#a78bfa)",border:"none",borderRadius:14,padding:"15px",color:"#fff",fontSize:15,fontWeight:700,cursor:"pointer",fontFamily:ff,boxShadow:"0 4px 20px rgba(109,40,217,0.3)"}}>
             Kirim Request →
           </button>
           <div style={{fontSize:10,color:C.sub,textAlign:"center",marginTop:10}}>Tim kami menghubungi dalam 1x24 jam</div>
@@ -1631,7 +1694,7 @@ function App() {
             return (
               <div key={t.id} onClick={()=>setSelectedPack(t.id)}
                 style={{background:isSel?"linear-gradient(135deg,"+t.color+"12,"+t.color+"05)":"rgba(255,255,255,0.02)",border:"2px solid "+(isSel?t.color+"55":"rgba(255,255,255,0.05)"),borderRadius:18,padding:"18px 16px",marginBottom:10,cursor:"pointer",position:"relative",transition:"all 0.15s"}}>
-                {t.id==="pro"&&<div style={{position:"absolute",top:-1,right:14,background:"linear-gradient(135deg,#6d28d9,#8b5cf6)",borderRadius:"0 0 10px 10px",padding:"3px 10px",fontSize:9,fontWeight:700,color:"#fff",letterSpacing:1}}>POPULER</div>}
+                {t.id==="pro"&&<div style={{position:"absolute",top:-1,right:14,background:"linear-gradient(135deg,#6d28d9,#a78bfa)",borderRadius:"0 0 10px 10px",padding:"3px 10px",fontSize:9,fontWeight:700,color:"#fff",letterSpacing:1}}>POPULER</div>}
                 <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",marginBottom:12}}>
                   <div style={{display:"flex",alignItems:"center",gap:10}}>
                     <div style={{width:44,height:44,borderRadius:12,background:t.color+"18",border:"1px solid "+t.color+"30",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>{t.icon}</div>
@@ -1651,7 +1714,7 @@ function App() {
                   ))}
                 </div>
                 {isSel&&<button onClick={e=>{e.stopPropagation();setPricingStep(1);}}
-                  style={{width:"100%",background:"linear-gradient(135deg,#6d28d9,#8b5cf6)",border:"none",borderRadius:12,padding:"12px",color:"#fff",fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:ff,boxShadow:"0 4px 20px rgba(109,40,217,0.25)"}}>
+                  style={{width:"100%",background:"linear-gradient(135deg,#6d28d9,#a78bfa)",border:"none",borderRadius:12,padding:"12px",color:"#fff",fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:ff,boxShadow:"0 4px 20px rgba(109,40,217,0.25)"}}>
                   Pilih {t.name} →
                 </button>}
               </div>
@@ -1668,7 +1731,7 @@ function App() {
               {[["Max Users",["10","50","∞"]],["Referral",["✓","✓","✓"]],["LBP & Wallet",["✓","✓","✓"]],["Mining LBP",["–","✓","✓"]],["Member Card",["–","✓","✓"]],["Custom Brand",["–","–","✓"]],["Support",["Komunitas","Email","Prioritas"]]].map(([l,vals],ri)=>(
                 <div key={ri} style={{display:"grid",gridTemplateColumns:"1fr repeat(3,1fr)",padding:"9px 12px",borderBottom:ri<6?"1px solid rgba(255,255,255,0.04)":"none"}}>
                   <div style={{fontSize:11,color:C.sub}}>{l}</div>
-                  {vals.map((v,vi)=><div key={vi} style={{fontSize:11,textAlign:"center",color:v==="–"?"#2a2a2a":v==="✓"?PACK_TIERS[vi].color:C.sub,fontWeight:v!=="–"?700:400}}>{v}</div>)}
+                  {vals.map((v,vi)=><div key={vi} style={{fontSize:11,textAlign:"center",color:v==="–"?"#3d3b55":v==="✓"?PACK_TIERS[vi].color:C.sub,fontWeight:v!=="–"?700:400}}>{v}</div>)}
                 </div>
               ))}
             </div>
@@ -1684,7 +1747,7 @@ function App() {
       <div style={{textAlign:"center",marginBottom:36}}>
         <div style={{fontSize:44,marginBottom:10}}>◈</div>
         <div style={{fontSize:11,letterSpacing:6,color:C.accent,textTransform:"uppercase",marginBottom:6}}>Sales Network</div>
-        <div style={{fontSize:32,fontWeight:800,background:"linear-gradient(135deg,#e2e2f0,#8b5cf6)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>NORTHGATE</div>
+        <div style={{fontSize:32,fontWeight:800,background:"linear-gradient(135deg,#e2e2f0,#a78bfa)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>NORTHGATE</div>
       </div>
       {lErr&&<div style={{background:"rgba(248,113,113,0.1)",border:"1px solid rgba(248,113,113,0.25)",borderRadius:12,padding:"12px 16px",fontSize:13,color:C.red,marginBottom:16,textAlign:"center"}}>⚠ {lErr}</div>}
       <Inp label="Username" value={lUser} onChange={e=>setLUser(e.target.value)} placeholder="Masukkan username" autoCapitalize="none"/>
@@ -1710,7 +1773,7 @@ function App() {
       <div style={{textAlign:"center",marginBottom:36}}>
         <div style={{fontSize:44,marginBottom:10}}>✦</div>
         <div style={{fontSize:11,letterSpacing:6,color:C.accent,textTransform:"uppercase",marginBottom:6}}>Sales Network</div>
-        <div style={{fontSize:32,fontWeight:800,background:"linear-gradient(135deg,#e2e2f0,#8b5cf6)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>DAFTAR</div>
+        <div style={{fontSize:32,fontWeight:800,background:"linear-gradient(135deg,#e2e2f0,#a78bfa)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>DAFTAR</div>
         <div style={{fontSize:13,color:C.sub,marginTop:6,display:"flex",alignItems:"center",justifyContent:"center",gap:5}}>Dapat <LBPDisplay amount={settings.newUserBonus} size={15} fontSize={13}/> = {fmt(settings.newUserBonus*LBP_TO_IDR)} bonus!</div>
       </div>
       {rErr&&<div style={{background:"rgba(248,113,113,0.1)",border:"1px solid rgba(248,113,113,0.25)",borderRadius:12,padding:"12px 16px",fontSize:13,color:C.red,marginBottom:16,textAlign:"center"}}>⚠ {rErr}</div>}
@@ -1839,7 +1902,7 @@ function App() {
                       <div>
                         <div style={{fontSize:13,fontWeight:700}}>{o.qty} unit</div>
                         <div style={{fontSize:11,color:C.sub}}>{o.date}{o.time?" · "+o.time:""}</div>
-                        <div style={{fontSize:11,color:o.lbpActual!==undefined&&o.lbpActual<o.lbpGain?"#f87171":C.sub,marginTop:2}}>Profit {fmt(o.profit)} · +{(o.lbpActual!==undefined?o.lbpActual:o.lbpGain)} LBP {(o.lbpActual!==undefined&&o.lbpActual<o.lbpGain)?"(cap)":""}</div>
+                        <div style={{fontSize:11,color:o.lbpActual!==undefined&&o.lbpActual<o.lbpGain?"#fb7185":C.sub,marginTop:2}}>Profit {fmt(o.profit)} · +{(o.lbpActual!==undefined?o.lbpActual:o.lbpGain)} LBP {(o.lbpActual!==undefined&&o.lbpActual<o.lbpGain)?"(cap)":""}</div>
                       </div>
                       <button onClick={()=>approveOrder(u.id,o.id)} style={{background:"linear-gradient(135deg,#059669,#10b981)",border:"none",borderRadius:10,padding:"7px 14px",color:"#fff",fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:ff,flexShrink:0}}>✓ Approve</button>
                     </div>
@@ -2300,7 +2363,7 @@ function App() {
                             totalPaid:(co.totalPaid||0)+tier2.priceMonthly,
                           });
                           showToast("s","✅ Pembayaran bulan ini dicatat!");
-                        }} style={{background:"linear-gradient(135deg,#6d28d9,#8b5cf6)",border:"none",borderRadius:12,padding:"12px",color:"#fff",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:ff}}>
+                        }} style={{background:"linear-gradient(135deg,#6d28d9,#a78bfa)",border:"none",borderRadius:12,padding:"12px",color:"#fff",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:ff}}>
                           💳 Catat Bayar
                         </button>
                         <button onClick={()=>{
@@ -2697,7 +2760,7 @@ function App() {
             <div style={{display:"flex",alignItems:"center",gap:5,marginBottom:12,padding:"7px 10px",background:"rgba(139,92,246,0.05)",borderRadius:8,border:"1px solid rgba(139,92,246,0.12)"}}>
               {["Customer Order","Sales Konfirm","Admin Approve","Profit+LBP"].map((s,i,a)=>(
                 <React.Fragment key={i}>
-                  <span style={{fontSize:9,fontWeight:700,color:i===1?"#c084fc":"#3a3a5c",whiteSpace:"nowrap"}}>{s}</span>
+                  <span style={{fontSize:9,fontWeight:700,color:i===1?"#c084fc":"#5e5c80",whiteSpace:"nowrap"}}>{s}</span>
                   {i<a.length-1&&<span style={{fontSize:9,color:C.sub}}>›</span>}
                 </React.Fragment>
               ))}
@@ -2883,7 +2946,7 @@ function App() {
               </div>}
               {inputAmt>walletTotal&&<div style={{background:"rgba(248,113,113,0.06)",border:"1px solid rgba(248,113,113,0.2)",borderRadius:10,padding:"9px 14px",marginBottom:12,fontSize:12,color:C.red}}>{"Melebihi saldo ("+fmt(walletTotal)+")"}</div>}
               <button onClick={submitWithdraw} disabled={!ok}
-                style={{width:"100%",background:ok?"linear-gradient(135deg,#6d28d9,#8b5cf6)":"rgba(255,255,255,0.04)",border:"none",borderRadius:14,padding:"15px",color:ok?"#fff":"#333",fontSize:15,fontWeight:700,cursor:ok?"pointer":"not-allowed",fontFamily:ff,boxShadow:ok?"0 4px 20px rgba(109,40,217,0.3)":"none",marginBottom:24}}>
+                style={{width:"100%",background:ok?"linear-gradient(135deg,#6d28d9,#a78bfa)":"rgba(255,255,255,0.04)",border:"none",borderRadius:14,padding:"15px",color:ok?"#fff":"#333",fontSize:15,fontWeight:700,cursor:ok?"pointer":"not-allowed",fontFamily:ff,boxShadow:ok?"0 4px 20px rgba(109,40,217,0.3)":"none",marginBottom:24}}>
                 Ajukan Withdraw
               </button>
               {wdHist.length>0&&<>
