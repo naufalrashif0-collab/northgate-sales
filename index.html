@@ -64,7 +64,7 @@
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
   <script>
-    function hideSplash(){var s=document.getElementById('splash');if(s){s.classList.add('hide');setTimeout(function(){s.style.display='none'},500);}}
+    window.hideSplash=function hideSplash(){var s=document.getElementById('splash');if(s){s.classList.add('hide');setTimeout(function(){s.style.display='none'},500);}}
     setTimeout(hideSplash,3500);
     if('serviceWorker' in navigator){window.addEventListener('load',function(){navigator.serviceWorker.register('sw.js').catch(function(){});});}
   </script>
@@ -105,7 +105,7 @@ const MEMBER_CARDS = [
   { id:"master",  name:"Master Card",  icon:"👑", color:"#ff6bff", price:900,
     target:100, lbpBonus:12, referralPct:100,
     perks:["Target 100 penjualan/bulan","+12 LBP/produk (total 15 LBP)","Dashboard analytics penuh","Badge Master Elite"] },
-]];
+];
 
 const ACTIVE_EVENTS = [
   { id:"e1", title:"🔥 Flash Sale Weekend",  desc:"Bonus LBP ×2 setiap penjualan Sabtu & Minggu",               reward:"+2× LBP",   color:C.red, expiresDate:"2026-03-08", type:"lbp"    },
@@ -1221,6 +1221,10 @@ function App() {
 
   // Countdown ticker
   useEffect(()=>{
+    // Hide splash once React has mounted and painted
+    if(typeof hideSplash === 'function') {
+      requestAnimationFrame(()=>requestAnimationFrame(hideSplash));
+    }
     const id=setInterval(()=>setTick(p=>p+1),60000);
     return ()=>clearInterval(id);
   },[]);
@@ -3116,7 +3120,6 @@ function App() {
 
     const root = ReactDOM.createRoot(document.getElementById('root'));
     root.render(React.createElement(App));
-    hideSplash();
   </script>
 </body>
 </html>
